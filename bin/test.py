@@ -1,11 +1,11 @@
 #!/usr/bin/python
-import httplib2
-URL = "http://localhost:8080/foo/bar/baz"
+URL = "http://localhost:8080/foo/bar/baz?ok=bar"
 
-h = httplib2.Http()
+from asynchttp import Http
 
-for i in range(1, 3):
-    resp, content = h.request(URL)
+http = Http()
 
-print h.request(URL, headers = {"Connection": "close"})
+response, content = http.request(URL)
+print response
+print content
 

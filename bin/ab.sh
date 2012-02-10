@@ -1,3 +1,3 @@
 #!/bin/bash
 
-ab -c 15 -n 100000 -k http://localhost:8080/foobar/baz/quux
+ab -c 50 -k -n 1000000 http://localhost:8080/foobar/baz/quux

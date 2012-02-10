@@ -1,40 +1,79 @@
 -module(elli_request).
 -include("elli.hrl").
 
--export([handle/1]).
+-export([handle/5]).
 
-handle(Socket) ->
-    {Method, Path, Version, Headers} = get_headers(Socket),
-    Body = get_body(Socket, Headers),
+-record(req, {
+          method,
+          path,
+          args,
+          headers,
+          body
+}).
 
-    {ok, UserHeaders, UserBody} = user_callback(Method, Path, Headers, Body),
 
-    ResultHeaders = [{<<"Connection">>, <<"Keep-Alive">>} | [{'Content-Length', size(UserBody)} | UserHeaders]],
+handle(Socket, Callback, Method, FullPath, Version) ->
+    {Path, Args} = get_uri(FullPath),
+    RequestHeaders = get_headers(Socket),
+    Body = get_body(Socket, RequestHeaders),
 
-    Response = [<<"HTTP/1.1 200 OK\r\n">>,
-                encode_headers(ResultHeaders), <<"\r\n">>, UserBody],
-    ok = gen_tcp:send(Socket, Response),
+    Req = #req{method = Method, path = Path, args = Args,
+               headers = RequestHeaders,
+               body = Body},
 
-    connection_token(Version, Headers).
+
+    {ResponseCode, UserHeaders, UserBody} = execute_callback(Callback, Req),
+
+    ResponseHeaders = [
+                       {<<"Content-Length">>, size(UserBody)},
+                       {<<"Connection">>, connection_token(Version, RequestHeaders)}
+                       | UserHeaders],
+    %% io:format("response headers: ~p~n", [ResponseHeaders]),
+
+    Response = [responsecode2bin(ResponseCode), <<"\r\n">>,
+                encode_headers(ResponseHeaders), <<"\r\n">>,
+                UserBody],
+
+    {Response, connection_token(Version, RequestHeaders)}.
+
+
+responsecode2bin(200) -> <<"HTTP/1.1 200 OK">>;
+responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
+
+
+execute_callback(C, Req) ->
+    try C(Req) of
+        {ok, Headers, Body}       -> {200, Headers, Body};
+        {HttpCode, Headers, Body} -> {HttpCode, Headers, Body}
+    catch
+        exit:Exit ->
+            io:format("crash: ~p~n", [Exit]),
+            {500, [], <<>>}
+    end.
+
+
+get_uri(FullPath) ->
+    case binary:split(FullPath, [<<"?">>]) of
+        [URI]       -> {URI, <<>>};
+        [URI, Args] -> {URI, Args}
+    end.
+
 
 connection_token({1, 1}, Headers) ->
     case proplists:get_value(<<"Connection">>, Headers) of
-        <<"close">> -> close;
-        _           -> keep_alive
+        <<"close">> -> <<"close">>;
+        _           -> <<"Keep-Alive">>
     end;
 
 connection_token({1, 0}, Headers) ->
     case proplists:get_value(<<"Connection">>, Headers) of
-        <<"Keep-Alive">> -> keep_alive;
-        _                -> close
+        <<"Keep-Alive">> -> <<"Keep-Alive">>;
+        _                -> <<"close">>
     end.
 
 get_headers(Socket) ->
-    inet:setopts(Socket, [{packet, http_bin}, {active, once}]),
-    receive
-        {http, _, {http_request, Method, Path, Version}} ->
-            {Method, Path, Version, get_headers(Socket, [], 0)}
-    end.
+    get_headers(Socket, [], 0).
+
 get_headers(Socket, Headers, HeadersCount) ->
     inet:setopts(Socket, [{active, once}]),
     receive
@@ -55,9 +94,6 @@ get_body(Socket, Headers) ->
             Body
     end.
 
-
-user_callback(_Method, _Path, _Headers, _Body) ->
-    {ok, [], <<"foobar">>}.
 
 
 encode_headers([]) ->
