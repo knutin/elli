@@ -14,6 +14,8 @@ handle(Req) ->
             {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
         [<<"crash">>] ->
             throw(foobar);
+        [<<"compressed">>] ->
+            {ok, [], binary:copy(<<"Hello World!">>, 86)};
         [<<"chunked">>] ->
             Ref = elli_request:chunk_ref(Req),
             spawn(fun() -> ?MODULE:chunk_loop(Ref) end),

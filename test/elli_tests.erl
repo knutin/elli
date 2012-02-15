@@ -8,7 +8,8 @@ elli_test_() ->
      [
       ?_test(hello_world()),
       ?_test(not_found()),
-      ?_test(crash())
+      ?_test(crash()),
+      ?_test(encoding())
      ]}.
 
 
@@ -45,7 +46,6 @@ not_found() ->
     ?assertEqual([{"Connection", "Keep-Alive"},
                   {"Content-Length", "0"}], headers(Response)),
     ?assertEqual(<<>>, body(Response)),
-
     stop(S).
 
 crash() ->
@@ -55,7 +55,17 @@ crash() ->
     ?assertEqual([{"Connection", "Keep-Alive"},
                   {"Content-Length", "0"}], headers(Response)),
     ?assertEqual(<<>>, body(Response)),
+    stop(S).
 
+encoding() ->
+    S = s(),
+    {ok, Response} = lhttpc:request("http://localhost:8080/compressed", "GET",
+                                    [{"Accept-Encoding", "gzip"}], 1000),
+    ?assertEqual({200, "OK"}, status(Response)),
+    ?assertEqual([{"Connection", "Keep-Alive"},
+                  {"Content-Encoding", "gzip"},
+                  {"Content-Length", "41"}], headers(Response)),
+    ?assertEqual(binary:copy(<<"Hello World!">>, 86), zlib:gunzip(body(Response))),
     stop(S).
 
 
@@ -70,7 +80,7 @@ body({_, _, Body}) ->
     Body.
 
 headers({_, Headers, _}) ->
-    Headers.
+    lists:sort(Headers).
 
 
 stop(S) ->
