@@ -37,8 +37,11 @@ execute_callback(Req, Callback) ->
         {HttpCode, Headers, Body} -> {HttpCode, Headers, Body};
         {chunk, Headers}          -> {chunk, Headers}
     catch
+        throw:Exception ->
+            Callback:request_throw(Req, Exception),
+            {500, [], <<>>};
         exit:Exit ->
-            io:format("crash: ~p~n", [Exit]),
+            Callback:request_exit(Req, Exit),
             {500, [], <<>>}
     end.
 

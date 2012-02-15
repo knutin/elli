@@ -4,7 +4,7 @@
 -export([start_link/3, accept/3, handle_request/2, chunk_loop/3]).
 
 start_link(Server, ListenSocket, Callback) ->
-    proc_lib:spawn_link(?MODULE, accept, [Server, ListenSocket, Callback]).
+    spawn_link(?MODULE, accept, [Server, ListenSocket, Callback]).
 
 %% @doc: Accept on the socket until a client connects. Handles the
 %% request and loops if we're using keep alive or chunked transfer.
@@ -15,16 +15,19 @@ accept(Server, ListenSocket, Callback) ->
             ?MODULE:handle_request(Socket, Callback),
             exit(normal);
         {error, timeout} ->
-            ?MODULE:accept(Server, ListenSocket, Callback)
+            ?MODULE:accept(Server, ListenSocket, Callback);
+        {error, closed} ->
+            exit(normal)
     end.
 
 %% @doc: Handle a HTTP request that will possibly come on the
 %% socket. If nothing happens within the keep alive timeout, the
 %% connection is closed.
 handle_request(Socket, Callback) ->
-    {Method, Path, Args, Version} = get_request(Socket),
-    Headers = get_headers(Socket),
-    Body = get_body(Socket, Headers),
+    AcceptStart = now(),
+    {Method, Path, Args, Version} = get_request(Socket),       RequestStart = now(),
+    Headers                       = get_headers(Socket),       HeadersEnd = now(),
+    Body                          = get_body(Socket, Headers), BodyEnd = now(),
 
     Req = #req{method = Method, path = Path, args = Args, version = Version,
                headers = Headers, body = Body,
@@ -34,14 +37,23 @@ handle_request(Socket, Callback) ->
         {Response, chunked} ->
             ok = gen_tcp:send(Socket, Response),
             inet:setopts(Socket, [{active, once}]),
-            chunk_loop(Socket, Req);
+            chunk_loop(Socket, Req),
+            Callback:request_complete(Req, Response, AcceptStart, RequestStart,
+                                      HeadersEnd, BodyEnd, now(), now()),
+            ok;
         {Response, keep_alive} ->
+            UserEnd = now(),
             ok = gen_tcp:send(Socket, Response),
+            Callback:request_complete(Req, Response, AcceptStart, RequestStart,
+                                      HeadersEnd, BodyEnd, UserEnd, now()),
             ?MODULE:handle_request(Socket, Callback);
         {Response, close} ->
+            UserEnd = now(),
             ok = gen_tcp:send(Socket, Response),
             gen_tcp:close(Socket),
-            exit(closing)
+            Callback:request_complete(Req, Response, AcceptStart, RequestStart,
+                                      HeadersEnd, BodyEnd, UserEnd, now()),
+            exit(normal)
     end.
 
 
@@ -80,7 +92,7 @@ get_request(Socket) ->
         {http, _, {http_request, Method, Path, Version}} ->
             {URI, Args} = parse_path(Path),
             {Method, URI, Args, Version}
-    after 1000 ->
+    after 50000 ->
             io:format("keep alive timeout, closing~n"),
             gen_tcp:close(Socket),
             exit(normal)

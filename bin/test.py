@@ -1,11 +1,28 @@
 #!/usr/bin/python
-URL = "http://localhost:8080/foo/bar/baz?ok=bar"
+import sys
+import eventlet
+import time
+from eventlet.green import urllib2
 
-from asynchttp import Http
+URL = "http://localhost:8080/hello/world"
+NUM_REQS = int(sys.argv[1])
 
-http = Http()
+def fetch():
+    v = urllib2.urlopen(URL).read()
+    return
 
-response, content = http.request(URL)
-print response
-print content
+
+pool = eventlet.GreenPool(size=25)
+
+start = time.time()
+
+map(lambda _: pool.spawn_n(fetch), range(1, NUM_REQS))
+
+pool.waitall()
+
+end = time.time()
+duration = end - start
+
+
+print NUM_REQS / duration, "rps"
 
