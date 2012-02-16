@@ -2,6 +2,7 @@
 -export([handle/1, request_complete/8, request_throw/2, request_exit/2]).
 -export([chunk_loop/1]).
 -include("elli.hrl").
+-behaviour(elli_handler).
 
 %% TODO: Turn into behaviour. Use callback return specs from R15.
 
