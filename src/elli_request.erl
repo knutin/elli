@@ -17,14 +17,16 @@ handle(Req, Callback) ->
             {Response, chunked};
 
         {ResponseCode, UserHeaders, UserBody} ->
+            {Body, Encoding} = encode_body(UserBody, Req),
             Headers = [
-                       {<<"Content-Length">>, size(UserBody)},
-                       {<<"Connection">>, connection_token(Req)}
+                       {<<"Connection">>, connection_token(Req)},
+                       {<<"Content-Length">>, size(Body)},
+                       content_encoding(Encoding)
                        | UserHeaders],
 
             Response = [responsecode2bin(ResponseCode), <<"\r\n">>,
                         encode_headers(Headers), <<"\r\n">>,
-                        UserBody],
+                        Body],
 
             {Response, connection_atom(Req)}
     end.
@@ -93,8 +95,41 @@ connection_atom(Req) ->
         <<"close">>      -> close
     end.
 
+content_encoding(gzip)    -> {<<"Content-Encoding">>, <<"gzip">>};
+content_encoding(deflate) -> {<<"Content-Encoding">>, <<"deflate">>};
+content_encoding(none)    -> [].
+
+
+accepted_encoding(Headers) ->
+    Encodings = binary:split(
+                  proplists:get_value(<<"Accept-Encoding">>, Headers, <<>>),
+                  [<<",">>], [global]),
+    case Encodings of
+        [E] -> E;
+        [E|_] -> E
+    end.
+
+encode_body(Body, #req{headers = Headers}) ->
+    case should_compress(Body) of
+        true ->
+            case accepted_encoding(Headers) of
+                <<"gzip">>    -> {zlib:gzip(Body), gzip};
+                <<"deflate">> -> {zlib:compress(Body), deflate}
+            end;
+        false ->
+            {Body, none}
+    end.
+
+
+should_compress(Body) when size(Body) >= 1024 -> true;
+should_compress(_)                            -> false.
+
+
 encode_headers([]) ->
     [];
+
+encode_headers([[] | H]) ->
+    encode_headers(H);
 encode_headers([{K, V} | H]) ->
     [encode_value(K), <<": ">>, encode_value(V), <<"\r\n">>, encode_headers(H)].
 

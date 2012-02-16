@@ -8,20 +8,30 @@
 
 
 handle(Req) ->
-    case elli_request:split_path(Req) of
-        [<<"hello">>, <<"world">>] ->
-            {ok, [], <<"Hello World!">>};
-        [<<"headers.html">>] ->
-            {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
-        [<<"crash">>] ->
-            throw(foobar);
-        [<<"chunked">>] ->
-            Ref = elli_request:chunk_ref(Req),
-            spawn(fun() -> ?MODULE:chunk_loop(Ref) end),
-            {chunk, []};
-        _ ->
-            {404, [], <<>>}
-    end.
+    handle(Req#req.method, elli_request:split_path(Req), Req).
+
+handle('GET',[<<"hello">>, <<"world">>], _Req) ->
+    {ok, [], <<"Hello World!">>};
+
+handle('GET',[<<"headers.html">>], _Req) ->
+    {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
+
+handle('GET', [<<"crash">>], _Req) ->
+    throw(foobar);
+
+handle('GET', [<<"compressed">>], _Req) ->
+    {ok, [], binary:copy(<<"Hello World!">>, 86)};
+
+handle('GET', [<<"chunked">>], Req) ->
+    Ref = elli_request:chunk_ref(Req),
+    spawn(fun() -> ?MODULE:chunk_loop(Ref) end),
+    {chunk, []};
+
+handle(_, _, _Req) ->
+    {404, [], <<>>}.
+
+
+
 
 chunk_loop(Ref) ->
     chunk_loop(Ref, 10).
