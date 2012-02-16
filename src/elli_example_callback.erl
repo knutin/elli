@@ -1,5 +1,6 @@
 -module(elli_example_callback).
--export([handle/1, request_complete/8, request_throw/2, request_exit/2]).
+-export([handle/1, request_complete/8]).
+-export([request_throw/2, request_exit/2, request_error/2]).
 -export([chunk_loop/1]).
 -include("elli.hrl").
 -behaviour(elli_handler).
@@ -74,4 +75,7 @@ request_throw(Req, Exception) ->
     ok.
 
 request_exit(Req, Exit) ->
+    ok.
+
+request_error(Req, Error) ->
     ok.

@@ -4,6 +4,7 @@
 -export([handle/2, send_chunk/2, chunk_ref/1, split_path/1]).
 
 
+-spec handle(#req{}, callback()) -> {response(), connection_token_atom() | chunked}.
 %% @doc: Execute the callback module, create HTTP response based on
 %% the result.
 handle(Req, Callback) ->
@@ -32,7 +33,9 @@ handle(Req, Callback) ->
     end.
 
 
-
+-spec execute_callback(#req{}, callback()) ->
+                              {response_code(), headers(), body()} |
+                              {chunk, headers()}.
 execute_callback(Req, Callback) ->
     try Callback:handle(Req) of
         {ok, Headers, Body}       -> {200, Headers, Body};
@@ -41,6 +44,9 @@ execute_callback(Req, Callback) ->
     catch
         throw:Exception ->
             Callback:request_throw(Req, Exception),
+            {500, [], <<>>};
+        error:Error ->
+            Callback:request_error(Req, Error),
             {500, [], <<>>};
         exit:Exit ->
             Callback:request_exit(Req, Exit),
@@ -135,5 +141,5 @@ encode_headers([{K, V} | H]) ->
 
 
 encode_value(V) when is_integer(V) -> ?i2l(V);
-encode_value(V) when is_binary(V)  -> V;
-encode_value(V) when is_atom(V)    -> atom_to_binary(V, latin1).
+encode_value(V) when is_binary(V)  -> V.
+

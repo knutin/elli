@@ -3,9 +3,11 @@
 
 -export([start_link/3, accept/3, handle_request/2, chunk_loop/3]).
 
+-spec start_link(pid(), port(), callback()) -> pid().
 start_link(Server, ListenSocket, Callback) ->
     spawn_link(?MODULE, accept, [Server, ListenSocket, Callback]).
 
+-spec accept(pid(), port(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
 %% request and loops if we're using keep alive or chunked transfer.
 accept(Server, ListenSocket, Callback) ->
@@ -13,13 +15,14 @@ accept(Server, ListenSocket, Callback) ->
         {ok, Socket} ->
             gen_server:cast(Server, accepted),
             ?MODULE:handle_request(Socket, Callback),
-            exit(normal);
+            ok;
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
         {error, closed} ->
-            exit(normal)
+            ok
     end.
 
+-spec handle_request(port(), callback()) -> ok.
 %% @doc: Handle a HTTP request that will possibly come on the
 %% socket. If nothing happens within the keep alive timeout, the
 %% connection is closed.
@@ -53,7 +56,7 @@ handle_request(Socket, Callback) ->
             gen_tcp:close(Socket),
             Callback:request_complete(Req, Response, AcceptStart, RequestStart,
                                       HeadersEnd, BodyEnd, UserEnd, now()),
-            exit(normal)
+            ok
     end.
 
 
@@ -106,6 +109,7 @@ parse_path({abs_path, FullPath}) ->
         [URI, Args] -> {URI, Args}
     end.
 
+-spec get_headers(port()) -> headers().
 get_headers(Socket) ->
     get_headers(Socket, [], 0).
 
@@ -119,6 +123,7 @@ get_headers(Socket, Headers, HeadersCount) ->
                         HeadersCount + 1)
     end.
 
+-spec get_body(port(), headers()) -> body().
 get_body(Socket, Headers) ->
     case proplists:get_value('Content-Length', Headers, undefined) of
         undefined ->

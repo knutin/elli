@@ -1,12 +1,22 @@
 
+-type callback() :: atom.
+
+-type path() :: binary().
+-type args() :: binary().
+-type version() :: {1,0} | {1,1}.
 -type header() :: {Key::binary(), Value::binary() | string()}.
 -type headers() :: [header()].
 -type body() :: binary().
+-type response() :: iolist().
 
 -type response_code() :: 200 | 404 | 500.
+-type connection_token_atom() :: keep_alive | close.
 
 -define(l2i(L), list_to_integer(L)).
 -define(i2l(I), integer_to_list(I)).
+
+-type timestamp() :: {integer(), integer(), integer()}.
+
 
 -record(state, {socket,
                 acceptors = 0,
@@ -15,11 +25,11 @@
 }).
 
 -record(req, {
-          method,
-          path,
+          method :: 'GET' | 'POST',
+          path :: binary(),
           args,
           version,
-          headers,
-          body,
-          pid
+          headers :: headers(),
+          body :: body(),
+          pid :: pid()
 }).
