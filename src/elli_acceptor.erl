@@ -125,12 +125,12 @@ get_headers(Socket, Headers, HeadersCount) ->
 
 -spec get_body(port(), headers()) -> body().
 get_body(Socket, Headers) ->
-    case proplists:get_value('Content-Length', Headers, undefined) of
+    case proplists:get_value(<<"Content-Length">>, Headers, undefined) of
         undefined ->
             <<>>;
         ContentLength ->
             inet:setopts(Socket, [{active, false}, {packet, raw}]),
-            {ok, Body} = gen_tcp:recv(Socket, ?l2i(ContentLength)),
+            {ok, Body} = gen_tcp:recv(Socket, ?b2i(ContentLength)),
             Body
     end.
 
