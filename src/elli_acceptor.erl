@@ -26,14 +26,22 @@ accept(Server, ListenSocket, Callback) ->
 %% @doc: Handle a HTTP request that will possibly come on the
 %% socket. If nothing happens within the keep alive timeout, the
 %% connection is closed.
-handle_request(Socket, Callback) ->
-    inet:setopts(Socket, [{packet, raw}, {active, false}]),
+handle_request(Socket, {CallbackMod, CallbackArgs} = Callback) ->
     AcceptStart = now(),
-    {Method, Path, Args, Version, Buf0} = get_request(Socket),        RequestStart = now(),
-    {Headers, Buf1}                     = get_headers(Socket, Buf0),    HeadersEnd = now(),
-    Body                                = get_body(Socket, Headers, Buf1), BodyEnd = now(),
+    {Method, Path, Args, V, Buf0} = get_request(Socket),        RequestStart = now(),
+    {Headers, Buf1}               = get_headers(Socket, V, Buf0), HeadersEnd = now(),
+    Body                          = get_body(Socket, Headers, Buf1), BodyEnd = now(),
 
-    Req = #req{method = Method, path = Path, args = Args, version = Version,
+    %% Big-ip hack
+    case V of
+        {0, 9} ->
+            gen_tcp:send(Socket, <<"Hello World!\r\n">>),
+            exit(normal);
+        _ ->
+            ok
+    end,
+
+    Req = #req{method = Method, path = Path, args = Args, version = V,
                headers = Headers, body = Body,
                pid = self()},
 
@@ -42,23 +50,38 @@ handle_request(Socket, Callback) ->
             ok = gen_tcp:send(Socket, Response),
             inet:setopts(Socket, [{active, once}]),
             chunk_loop(Socket, Req),
-            Callback:request_complete(Req, Response, AcceptStart, RequestStart,
-                                      HeadersEnd, BodyEnd, now(), now()),
+            CallbackMod:request_complete(Req, Response, AcceptStart, RequestStart,
+                                      HeadersEnd, BodyEnd, now(), now(), CallbackArgs),
             ok;
         {Response, keep_alive} ->
             UserEnd = now(),
-            ok = gen_tcp:send(Socket, Response),
-            Callback:request_complete(Req, Response, AcceptStart, RequestStart,
-                                      HeadersEnd, BodyEnd, UserEnd, now()),
+            send_response(Socket, Response),
+            CallbackMod:request_complete(Req, Response, AcceptStart, RequestStart,
+                                      HeadersEnd, BodyEnd, UserEnd, now(), CallbackArgs),
             ?MODULE:handle_request(Socket, Callback);
         {Response, close} ->
             UserEnd = now(),
+            case V of
+                {0, 9} ->
+                    error_logger:info_msg("Response: ~p~n", [Response]);
+                _ ->
+                    ok
+            end,
             ok = gen_tcp:send(Socket, Response),
             gen_tcp:close(Socket),
-            Callback:request_complete(Req, Response, AcceptStart, RequestStart,
-                                      HeadersEnd, BodyEnd, UserEnd, now()),
+            CallbackMod:request_complete(Req, Response, AcceptStart, RequestStart,
+                                         HeadersEnd, BodyEnd, UserEnd, now(), CallbackArgs),
             ok
     end.
+
+send_response(Socket, Response) ->
+    case gen_tcp:send(Socket, Response) of
+        ok -> ok;
+        {error, closed} ->
+            error_logger:info_msg("client closed connection before we could send response~n"),
+            ok
+    end.
+            
 
 
 chunk_loop(Socket, Req) ->
@@ -101,19 +124,27 @@ get_request(Socket, Buffer) ->
                 {ok, {http_request, Method, Path, Version}, Rest} ->
                     {URI, Args} = parse_path(Path),
                     {Method, URI, Args, Version, Rest};
+                {ok, {http_error, Bin}, Rest} ->
+                    error_logger:info_msg("Error parsing request: ~p~n", [{Bin, Rest, NewBuffer}]),
+                    error_terminate(400, Socket);
                 {more, _} ->
                     get_request(Socket, NewBuffer)
             end;
         {error, timeout} ->
-            io:format("keep alive timeout, closing~n"),
+            %%io:format("keep alive timeout, closing~n"),
             gen_tcp:close(Socket),
             exit(normal);
         {error, closed} ->
-            io:format("socket closed while waiting for request~n"),
+            %%io:format("socket closed while waiting for request~n"),
             ok = gen_tcp:close(Socket),
             exit(normal)
     end.
 
+
+error_terminate(_Code, Socket) ->
+    gen_tcp:send(Socket, [<<"400 Bad Request">>]),
+    gen_tcp:close(Socket),
+    exit(normal).
 
 
 parse_path({abs_path, FullPath}) ->
@@ -122,8 +153,10 @@ parse_path({abs_path, FullPath}) ->
         [URI, Args] -> {URI, Args}
     end.
 
--spec get_headers(port(), binary()) -> headers().
-get_headers(Socket, Buffer) ->
+-spec get_headers(port(), term(), binary()) -> headers().
+get_headers(_Socket, {0, 9}, _) ->
+    {[], <<>>};
+get_headers(Socket, {1, _}, Buffer) ->
     get_headers(Socket, Buffer, [], 0).
 
 get_headers(Socket, Buffer, Headers, HeadersCount) ->
@@ -133,7 +166,6 @@ get_headers(Socket, Buffer, Headers, HeadersCount) ->
             get_headers(Socket, Rest, NewHeaders, HeadersCount + 1);
         {ok, http_eoh, Rest} ->
             {Headers, Rest};
-
         {more, _} ->
             case gen_tcp:recv(Socket, 0, 10000) of
                 {ok, Data} ->
@@ -159,8 +191,17 @@ get_body(Socket, Headers, Buffer) ->
                 0 ->
                     Buffer;
                 N ->
-                    {ok, Data} = gen_tcp:recv(Socket, N, 30000),
-                    <<Buffer/binary, Data/binary>>
+                    case gen_tcp:recv(Socket, N, 30000) of
+                        {ok, Data} ->
+                            <<Buffer/binary, Data/binary>>;
+                        {error, timeout} ->
+                            ok = gen_tcp:close(Socket),
+                            %%error_logger:info_msg("recv body timeout~n"),
+                            exit(normal);
+                        {error, closed} ->
+                            ok = gen_tcp:close(Socket),
+                            exit(normal)
+                    end
             end
     end.
 

@@ -116,7 +116,7 @@ content_length(Body) ->
 accepted_encoding(Headers) ->
     Encodings = binary:split(
                   proplists:get_value(<<"Accept-Encoding">>, Headers, <<>>),
-                  [<<",">>], [global]),
+                  [<<",">>, <<";">>], [global]),
     case Encodings of
         [E] -> E;
         [E|_] -> E
@@ -129,7 +129,11 @@ encode_body(Body, #req{headers = Headers}) ->
                 <<"gzip">>     -> {zlib:gzip(Body), gzip};
                 <<"deflate">>  -> {zlib:compress(Body), deflate};
                 <<"identity">> -> {Body, none};
-                <<>>           -> {Body, none}
+                <<>>           -> {Body, none};
+                Other ->
+                    error_logger:info_msg("Other: ~p~n", [Other]),
+                    {Body, none}
+
             end;
         false ->
             {Body, none}
