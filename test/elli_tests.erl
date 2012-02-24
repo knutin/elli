@@ -56,8 +56,8 @@ crash() ->
     {ok, Response} = lhttpc:request("http://localhost:8080/crash", "GET", [], 1000),
     ?assertEqual({500, "Internal Server Error"}, status(Response)),
     ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "0"}], headers(Response)),
-    ?assertEqual(<<>>, body(Response)),
+                  {"Content-Length", "21"}], headers(Response)),
+    ?assertEqual(<<"Internal server error">>, body(Response)),
     stop(S).
 
 
