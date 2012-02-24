@@ -75,10 +75,10 @@ responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
 
 
 split_path(#req{path = <<"/", Path/binary>>}) ->
-    binary:split(Path, [<<"/">>], [global]);
+    binary:split(Path, [<<"/">>], [global, trim]);
 
 split_path(#req{path = Path}) ->
-    binary:split(Path, [<<"/">>], [global]).
+    binary:split(Path, [<<"/">>], [global, trim]).
 
 
 

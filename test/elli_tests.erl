@@ -1,5 +1,6 @@
 -module(elli_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include("elli.hrl").
 
 
 elli_test_() ->
@@ -9,7 +10,8 @@ elli_test_() ->
       ?_test(hello_world()),
       ?_test(not_found()),
       ?_test(crash()),
-      ?_test(encoding())
+      ?_test(encoding()),
+      ?_test(split_path())
 %%      ?_test(content_length())
      ]}.
 
@@ -57,6 +59,11 @@ crash() ->
                   {"Content-Length", "0"}], headers(Response)),
     ?assertEqual(<<>>, body(Response)),
     stop(S).
+
+
+split_path() ->
+    ?assertEqual([<<"foo">>, <<"bar">>],
+                 elli_request:split_path(#req{path = <<"/foo/bar/">>})).
 
 encoding() ->
     S = s(),
