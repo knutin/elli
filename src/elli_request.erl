@@ -126,9 +126,10 @@ encode_body(Body, #req{headers = Headers}) ->
     case should_compress(Body) of
         true ->
             case accepted_encoding(Headers) of
-                <<"gzip">>    -> {zlib:gzip(Body), gzip};
-                <<"deflate">> -> {zlib:compress(Body), deflate};
-                <<>>          -> {Body, none}
+                <<"gzip">>     -> {zlib:gzip(Body), gzip};
+                <<"deflate">>  -> {zlib:compress(Body), deflate};
+                <<"identity">> -> {Body, none};
+                <<>>           -> {Body, none}
             end;
         false ->
             {Body, none}
