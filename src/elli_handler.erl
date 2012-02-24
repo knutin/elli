@@ -8,12 +8,15 @@
     no_return().
 
 -callback request_complete(#req{}, response(),
-                           AcceptStart :: timestamp(), RequestStart :: timestamp(),
-                           HeadersEnd :: timestamp(), BodyEnd :: timestamp(),
-                           UserEnd :: timestamp(), RequestEnd :: timestamp(),
-                          callback_args()) ->
+                           AcceptStart :: timestamp(),
+                           RequestStart :: timestamp(),
+                           HeadersEnd :: timestamp(),
+                           BodyEnd :: timestamp(),
+                           UserEnd :: timestamp(),
+                           RequestEnd :: timestamp(),
+                           callback_args()) ->
     ok.
 
--callback request_throw(#req{}, term(), callback_args()) -> ok.
--callback request_exit(#req{}, term(), callback_args()) -> ok.
--callback request_error(#req{}, term(), callback_args()) -> ok.
+-callback request_throw(#req{}, term(), term(), callback_args()) -> ok.
+-callback request_exit(#req{}, term(), term(), callback_args()) -> ok.
+-callback request_error(#req{}, term(), term(), callback_args()) -> ok.

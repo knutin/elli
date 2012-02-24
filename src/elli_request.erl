@@ -43,13 +43,13 @@ execute_callback(Req, {CallbackMod, CallbackArgs}) ->
         {chunk, Headers}          -> {chunk, Headers}
     catch
         throw:Exception ->
-            CallbackMod:request_throw(Req, Exception, CallbackArgs),
+            CallbackMod:request_throw(Req, Exception, erlang:get_stacktrace(), CallbackArgs),
             {500, [], <<"Internal server error">>};
         error:Error ->
-            CallbackMod:request_error(Req, Error, CallbackArgs),
+            CallbackMod:request_error(Req, Error, erlang:get_stacktrace(), CallbackArgs),
             {500, [], <<"Internal server error">>};
         exit:Exit ->
-            CallbackMod:request_exit(Req, Exit, CallbackArgs),
+            CallbackMod:request_exit(Req, Exit, erlang:get_stacktrace(), CallbackArgs),
             {500, [], <<"Internal server error">>}
     end.
 
