@@ -1,6 +1,6 @@
 -module(elli_example_callback).
 -export([handle/2, request_complete/9]).
--export([request_throw/3, request_exit/3, request_error/3]).
+-export([request_throw/4, request_exit/4, request_error/4]).
 -export([chunk_loop/1]).
 -include("elli.hrl").
 -behaviour(elli_handler).
@@ -56,8 +56,8 @@ chunk_loop(Ref, N) ->
 
 
 
-request_complete(Req, Response, AcceptStart, RequestStart,
-                 HeadersEnd, BodyEnd, UserEnd, RequestEnd, _Args) ->
+request_complete(_Req, _Response, _AcceptStart, _RequestStart,
+                 _HeadersEnd, _BodyEnd, _UserEnd, _RequestEnd, _Args) ->
     %% io:format(
     %%   "REQUEST: ~s~n"
     %%   "    headers  : ~w us~n"
@@ -74,11 +74,11 @@ request_complete(Req, Response, AcceptStart, RequestStart,
 
     ok.
 
-request_throw(Req, Exception, _Args) ->
+request_throw(_Req, _Exception, _Stack, _Args) ->
     ok.
 
-request_exit(Req, Exit, _Args) ->
+request_exit(_Req, _Exit, _Stack, _Args) ->
     ok.
 
-request_error(Req, Error, _Args) ->
+request_error(_Req, _Error, _Stack, _Args) ->
     ok.
