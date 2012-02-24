@@ -42,7 +42,9 @@ init([Opts]) ->
     {ok, Socket} = gen_tcp:listen(8080, [binary,
                                          {reuseaddr, true},
                                          {backlog, 32768},
-                                         {packet, raw}]),
+                                         {packet, raw},
+                                         {active, false}
+                                        ]),
     Acceptors = [start_acceptor(Socket, {Callback, CallbackArgs}) || _ <- lists:seq(1, 20)],
 
     {ok, #state{socket = Socket,

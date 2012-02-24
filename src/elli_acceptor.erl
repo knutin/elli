@@ -27,10 +27,11 @@ accept(Server, ListenSocket, Callback) ->
 %% socket. If nothing happens within the keep alive timeout, the
 %% connection is closed.
 handle_request(Socket, Callback) ->
+    inet:setopts(Socket, [{packet, raw}, {active, false}]),
     AcceptStart = now(),
-    {Method, Path, Args, Version} = get_request(Socket),       RequestStart = now(),
-    Headers                       = get_headers(Socket),       HeadersEnd = now(),
-    Body                          = get_body(Socket, Headers), BodyEnd = now(),
+    {Method, Path, Args, Version, Buf0} = get_request(Socket),        RequestStart = now(),
+    {Headers, Buf1}                     = get_headers(Socket, Buf0),    HeadersEnd = now(),
+    Body                                = get_body(Socket, Headers, Buf1), BodyEnd = now(),
 
     Req = #req{method = Method, path = Path, args = Args, version = Version,
                headers = Headers, body = Body,
@@ -90,14 +91,26 @@ chunk_loop(Socket, Req, SocketState) ->
 
 
 get_request(Socket) ->
-    inet:setopts(Socket, [{packet, http_bin}, {active, once}]),
-    receive
-        {http, _, {http_request, Method, Path, Version}} ->
-            {URI, Args} = parse_path(Path),
-            {Method, URI, Args, Version}
-    after 50000 ->
+    get_request(Socket, <<>>).
+
+get_request(Socket, Buffer) ->
+    case gen_tcp:recv(Socket, 0, 60000) of
+        {ok, Data} ->
+            NewBuffer = <<Buffer/binary, Data/binary>>,
+            case erlang:decode_packet(http_bin, NewBuffer, []) of
+                {ok, {http_request, Method, Path, Version}, Rest} ->
+                    {URI, Args} = parse_path(Path),
+                    {Method, URI, Args, Version, Rest};
+                {more, _} ->
+                    get_request(Socket, NewBuffer)
+            end;
+        {error, timeout} ->
             io:format("keep alive timeout, closing~n"),
             gen_tcp:close(Socket),
+            exit(normal);
+        {error, closed} ->
+            io:format("socket closed while waiting for request~n"),
+            ok = gen_tcp:close(Socket),
             exit(normal)
     end.
 
@@ -109,29 +122,46 @@ parse_path({abs_path, FullPath}) ->
         [URI, Args] -> {URI, Args}
     end.
 
--spec get_headers(port()) -> headers().
-get_headers(Socket) ->
-    get_headers(Socket, [], 0).
+-spec get_headers(port(), binary()) -> headers().
+get_headers(Socket, Buffer) ->
+    get_headers(Socket, Buffer, [], 0).
 
-get_headers(Socket, Headers, HeadersCount) ->
-    inet:setopts(Socket, [{active, once}]),
-    receive
-        {http, _, http_eoh} ->
-            Headers;
-        {http, _, {http_header, _, Key, _, Value}} ->
-            get_headers(Socket, [{ensure_binary(Key), Value} | Headers],
-                        HeadersCount + 1)
+get_headers(Socket, Buffer, Headers, HeadersCount) ->
+    case erlang:decode_packet(httph_bin, Buffer, []) of
+        {ok, {http_header, _, Key, _, Value}, Rest} ->
+            NewHeaders = [{ensure_binary(Key), Value} | Headers],
+            get_headers(Socket, Rest, NewHeaders, HeadersCount + 1);
+        {ok, http_eoh, Rest} ->
+            {Headers, Rest};
+
+        {more, _} ->
+            case gen_tcp:recv(Socket, 0, 10000) of
+                {ok, Data} ->
+                    get_headers(Socket, <<Buffer/binary, Data/binary>>,
+                                Headers, HeadersCount);
+                {error, timeout} ->
+                    error_logger:info_msg("timeout in getting headers~n"),
+                    gen_tcp:close(Socket),
+                    exit(normal)
+            end
     end.
 
--spec get_body(port(), headers()) -> body().
-get_body(Socket, Headers) ->
+-spec get_body(port(), headers(), binary()) -> body().
+get_body(Socket, Headers, Buffer) ->
     case proplists:get_value(<<"Content-Length">>, Headers, undefined) of
         undefined ->
             <<>>;
-        ContentLength ->
-            inet:setopts(Socket, [{active, false}, {packet, raw}]),
-            {ok, Body} = gen_tcp:recv(Socket, ?b2i(ContentLength)),
-            Body
+        ContentLengthBin ->
+            ContentLength = ?b2i(ContentLengthBin),
+            BufSize = byte_size(Buffer),
+
+            case ContentLength - BufSize of
+                0 ->
+                    Buffer;
+                N ->
+                    {ok, Data} = gen_tcp:recv(Socket, N, 30000),
+                    <<Buffer/binary, Data/binary>>
+            end
     end.
 
 
