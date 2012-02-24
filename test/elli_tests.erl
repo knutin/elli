@@ -66,6 +66,12 @@ encoding() ->
                   {"Content-Encoding", "gzip"},
                   {"Content-Length", "41"}], headers(Response)),
     ?assertEqual(binary:copy(<<"Hello World!">>, 86), zlib:gunzip(body(Response))),
+
+    {ok, Response1} = lhttpc:request("http://localhost:8080/compressed", "GET", [], 1000),
+    ?assertEqual({200, "OK"}, status(Response1)),
+    ?assertEqual([{"Connection", "Keep-Alive"},
+                  {"Content-Length", "1032"}], headers(Response1)),
+    ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response1)),
     stop(S).
 
 

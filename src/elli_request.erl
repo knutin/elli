@@ -120,7 +120,8 @@ encode_body(Body, #req{headers = Headers}) ->
         true ->
             case accepted_encoding(Headers) of
                 <<"gzip">>    -> {zlib:gzip(Body), gzip};
-                <<"deflate">> -> {zlib:compress(Body), deflate}
+                <<"deflate">> -> {zlib:compress(Body), deflate};
+                <<>>          -> {Body, none}
             end;
         false ->
             {Body, none}
