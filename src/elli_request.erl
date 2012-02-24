@@ -44,13 +44,13 @@ execute_callback(Req, {CallbackMod, CallbackArgs}) ->
     catch
         throw:Exception ->
             CallbackMod:request_throw(Req, Exception, CallbackArgs),
-            {500, [], <<>>};
+            {500, [], <<"Internal server error">>};
         error:Error ->
             CallbackMod:request_error(Req, Error, CallbackArgs),
-            {500, [], <<>>};
+            {500, [], <<"Internal server error">>};
         exit:Exit ->
             CallbackMod:request_exit(Req, Exit, CallbackArgs),
-            {500, [], <<>>}
+            {500, [], <<"Internal server error">>}
     end.
 
 
