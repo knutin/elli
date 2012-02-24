@@ -1,6 +1,6 @@
 -module(elli_example_callback).
--export([handle/1, request_complete/8]).
--export([request_throw/2, request_exit/2, request_error/2]).
+-export([handle/2, request_complete/9]).
+-export([request_throw/3, request_exit/3, request_error/3]).
 -export([chunk_loop/1]).
 -include("elli.hrl").
 -behaviour(elli_handler).
@@ -8,7 +8,7 @@
 %% TODO: Turn into behaviour. Use callback return specs from R15.
 
 
-handle(Req) ->
+handle(Req, _Args) ->
     handle(Req#req.method, elli_request:split_path(Req), Req).
 
 handle('GET',[<<"hello">>, <<"world">>], _Req) ->
@@ -54,7 +54,7 @@ chunk_loop(Ref, N) ->
 
 
 request_complete(Req, Response, AcceptStart, RequestStart,
-                 HeadersEnd, BodyEnd, UserEnd, RequestEnd) ->
+                 HeadersEnd, BodyEnd, UserEnd, RequestEnd, _Args) ->
     %% io:format(
     %%   "REQUEST: ~s~n"
     %%   "    headers  : ~w us~n"
@@ -71,11 +71,11 @@ request_complete(Req, Response, AcceptStart, RequestStart,
 
     ok.
 
-request_throw(Req, Exception) ->
+request_throw(Req, Exception, _Args) ->
     ok.
 
-request_exit(Req, Exit) ->
+request_exit(Req, Exit, _Args) ->
     ok.
 
-request_error(Req, Error) ->
+request_error(Req, Error, _Args) ->
     ok.

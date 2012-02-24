@@ -36,20 +36,20 @@ handle(Req, Callback) ->
 -spec execute_callback(#req{}, callback()) ->
                               {response_code(), headers(), body()} |
                               {chunk, headers()}.
-execute_callback(Req, Callback) ->
-    try Callback:handle(Req) of
+execute_callback(Req, {CallbackMod, CallbackArgs}) ->
+    try CallbackMod:handle(Req, CallbackArgs) of
         {ok, Headers, Body}       -> {200, Headers, Body};
         {HttpCode, Headers, Body} -> {HttpCode, Headers, Body};
         {chunk, Headers}          -> {chunk, Headers}
     catch
         throw:Exception ->
-            Callback:request_throw(Req, Exception),
+            CallbackMod:request_throw(Req, Exception, CallbackArgs),
             {500, [], <<>>};
         error:Error ->
-            Callback:request_error(Req, Error),
+            CallbackMod:request_error(Req, Error, CallbackArgs),
             {500, [], <<>>};
         exit:Exit ->
-            Callback:request_exit(Req, Exit),
+            CallbackMod:request_exit(Req, Exit, CallbackArgs),
             {500, [], <<>>}
     end.
 

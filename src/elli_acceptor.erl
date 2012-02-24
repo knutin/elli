@@ -119,7 +119,7 @@ get_headers(Socket, Headers, HeadersCount) ->
         {http, _, http_eoh} ->
             Headers;
         {http, _, {http_header, _, Key, _, Value}} ->
-            get_headers(Socket, [{atom_to_binary(Key, latin1), Value} | Headers],
+            get_headers(Socket, [{ensure_binary(Key), Value} | Headers],
                         HeadersCount + 1)
     end.
 
@@ -133,3 +133,8 @@ get_body(Socket, Headers) ->
             {ok, Body} = gen_tcp:recv(Socket, ?l2i(ContentLength)),
             Body
     end.
+
+
+ensure_binary(Bin) when is_binary(Bin) -> Bin;
+ensure_binary(Atom) when is_atom(Atom)-> atom_to_binary(Atom, latin1).
+

@@ -1,5 +1,7 @@
 
--type callback() :: atom.
+-type callback_mod() :: atom.
+-type callback_args() :: any().
+-type callback() :: {callback_mod(), callback_args()}.
 
 -type path() :: binary().
 -type args() :: binary().
@@ -21,7 +23,7 @@
 -record(state, {socket,
                 acceptors = 0,
                 open_reqs = 0,
-                callback
+                callback :: callback()
 }).
 
 -record(req, {

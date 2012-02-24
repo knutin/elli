@@ -14,7 +14,8 @@
 %%% API
 %%%===================================================================
 
-start_link() -> start_link([{callback, elli_example_callback}]).
+start_link() -> start_link([{callback, elli_example_callback},
+                            {callback_args, []}]).
 
 start_link(Opts) ->
     gen_server:start_link(?MODULE, [Opts], []).
@@ -36,16 +37,17 @@ stop(S) ->
 init([Opts]) ->
     process_flag(trap_exit, true),
     Callback = proplists:get_value(callback, Opts), %% TODO: Check if handle/1 is exported
+    CallbackArgs = proplists:get_value(callback_args, Opts),
 
     {ok, Socket} = gen_tcp:listen(8080, [binary,
                                          {reuseaddr, true},
                                          {backlog, 32768},
                                          {packet, raw}]),
-    Acceptors = [start_acceptor(Socket, Callback) || _ <- lists:seq(1, 20)],
+    Acceptors = [start_acceptor(Socket, {Callback, CallbackArgs}) || _ <- lists:seq(1, 20)],
 
     {ok, #state{socket = Socket,
                 acceptors = Acceptors,
-                callback = Callback}}.
+                callback = {Callback, CallbackArgs}}}.
 
 
 handle_call(get_acceptors, _From, State) ->
