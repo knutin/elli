@@ -10,6 +10,7 @@ elli_test_() ->
       ?_test(not_found()),
       ?_test(crash()),
       ?_test(encoding())
+%%      ?_test(content_length())
      ]}.
 
 
@@ -44,8 +45,8 @@ not_found() ->
     {ok, Response} = lhttpc:request("http://localhost:8080/foobarbaz", "GET", [], 1000),
     ?assertEqual({404, "Not Found"}, status(Response)),
     ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "0"}], headers(Response)),
-    ?assertEqual(<<>>, body(Response)),
+                  {"Content-Length", "4"}], headers(Response)),
+    ?assertEqual(<<"body">>, body(Response)),
     stop(S).
 
 crash() ->
@@ -74,6 +75,17 @@ encoding() ->
     ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response1)),
     stop(S).
 
+%% content_length() ->
+%%     S = s(),
+%%     {ok, Response} = lhttpc:request("http://localhost:8080/304",
+%%                                     "GET", [], 1000),
+
+%%     ?assertEqual({304, "OK"}, status(Response)),
+%%     ?assertEqual([{"Connection", "Keep-Alive"},
+%%                   {"Content-Length", "0"}], headers(Response)),
+%%     ?assertEqual(<<>>, body(Response)),
+
+%%     stop(S).
 
 %%
 %% HELPERS

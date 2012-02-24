@@ -26,3 +26,4 @@ duration = end - start
 
 print NUM_REQS / duration, "rps"
 
+print urllib2.urlopen("http://localhost:8080/404").read()

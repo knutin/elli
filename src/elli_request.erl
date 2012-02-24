@@ -21,7 +21,7 @@ handle(Req, Callback) ->
             {Body, Encoding} = encode_body(UserBody, Req),
             Headers = [
                        {<<"Connection">>, connection_token(Req)},
-                       {<<"Content-Length">>, size(Body)},
+                       content_length(Body),
                        content_encoding(Encoding)
                        | UserHeaders],
 
@@ -29,7 +29,7 @@ handle(Req, Callback) ->
                         encode_headers(Headers), <<"\r\n">>,
                         Body],
 
-            {Response, connection_atom(Req)}
+            {Response, close_or_keepalive(Req, UserHeaders)}
     end.
 
 
@@ -69,6 +69,7 @@ send_chunk(Ref, Data) ->
 
 
 responsecode2bin(200) -> <<"HTTP/1.1 200 OK">>;
+responsecode2bin(304) -> <<"HTTP/1.1 304 Not Modified">>;
 responsecode2bin(404) -> <<"HTTP/1.1 404 Not Found">>;
 responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
 
@@ -95,7 +96,7 @@ connection_token(#req{version = {1, 0}, headers = Headers}) ->
         _                -> <<"close">>
     end.
 
-connection_atom(Req) ->
+close_or_keepalive(Req, _UserHeaders) ->
     case connection_token(Req) of
         <<"Keep-Alive">> -> keep_alive;
         <<"close">>      -> close
@@ -104,6 +105,12 @@ connection_atom(Req) ->
 content_encoding(gzip)    -> {<<"Content-Encoding">>, <<"gzip">>};
 content_encoding(deflate) -> {<<"Content-Encoding">>, <<"deflate">>};
 content_encoding(none)    -> [].
+
+content_length(Body) ->
+    case size(Body) of
+        0 -> [];
+        N -> {<<"Content-Length">>, N}
+    end.
 
 
 accepted_encoding(Headers) ->

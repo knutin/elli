@@ -28,8 +28,11 @@ handle('GET', [<<"chunked">>], Req) ->
     spawn(fun() -> ?MODULE:chunk_loop(Ref) end),
     {chunk, []};
 
+handle('GET', [<<"304">>], _Req) ->
+    {304, [], <<>>};
+
 handle(_, _, _Req) ->
-    {404, [], <<>>}.
+    {404, [], <<"body">>}.
 
 
 
