@@ -61,12 +61,6 @@ handle_request(Socket, {CallbackMod, CallbackArgs} = Callback) ->
             ?MODULE:handle_request(Socket, Callback);
         {Response, close} ->
             UserEnd = now(),
-            case V of
-                {0, 9} ->
-                    error_logger:info_msg("Response: ~p~n", [Response]);
-                _ ->
-                    ok
-            end,
             ok = gen_tcp:send(Socket, Response),
             gen_tcp:close(Socket),
             CallbackMod:request_complete(Req, Response, AcceptStart, RequestStart,
@@ -81,7 +75,6 @@ send_response(Socket, Response) ->
             error_logger:info_msg("client closed connection before we could send response~n"),
             ok
     end.
-            
 
 
 chunk_loop(Socket, Req) ->

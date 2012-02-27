@@ -31,6 +31,9 @@ handle('GET', [<<"chunked">>], Req) ->
 handle('GET', [<<"304">>], _Req) ->
     {304, [], <<>>};
 
+handle('GET', [<<"403">>], _Req) ->
+    throw({403, [], <<"Forbidden">>});
+
 handle(_, _, _Req) ->
     {404, [], <<"body">>}.
 

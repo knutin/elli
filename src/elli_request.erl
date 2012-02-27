@@ -42,6 +42,8 @@ execute_callback(Req, {CallbackMod, CallbackArgs}) ->
         {HttpCode, Headers, Body} -> {HttpCode, Headers, Body};
         {chunk, Headers}          -> {chunk, Headers}
     catch
+        throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
+            {ResponseCode, Headers, Body};
         throw:Exception ->
             CallbackMod:request_throw(Req, Exception, erlang:get_stacktrace(), CallbackArgs),
             {500, [], <<"Internal server error">>};
@@ -70,6 +72,7 @@ send_chunk(Ref, Data) ->
 
 responsecode2bin(200) -> <<"HTTP/1.1 200 OK">>;
 responsecode2bin(304) -> <<"HTTP/1.1 304 Not Modified">>;
+responsecode2bin(403) -> <<"HTTP/1.1 403 Forbidden">>;
 responsecode2bin(404) -> <<"HTTP/1.1 404 Not Found">>;
 responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
 
