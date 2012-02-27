@@ -1,8 +1,8 @@
 ## elli - experimental web server
 
 The purpose of this project is to try out a few experiments in the
-core of the web server loop to create a core that is as robust and
-performant as it can be.
+core of the web server loop to create a webserver that is as robust
+and performant as it can be.
 
 
 Goals:
