@@ -9,7 +9,7 @@
 
 
 handle(Req, _Args) ->
-    handle(Req#req.method, elli_request:split_path(Req), Req).
+    handle(Req#req.method, elli_request:path(Req), Req).
 
 handle('GET',[<<"hello">>, <<"world">>], _Req) ->
     {ok, [], <<"Hello World!">>};
