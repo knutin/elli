@@ -1,7 +1,7 @@
 -module(elli_request).
 -include("elli.hrl").
 
--export([handle/2, send_chunk/2, chunk_ref/1, split_path/1]).
+-export([handle/2, send_chunk/2, chunk_ref/1, path/1]).
 
 
 -spec handle(#req{}, callback()) -> {response(), connection_token_atom() | chunked}.
@@ -74,10 +74,14 @@ responsecode2bin(404) -> <<"HTTP/1.1 404 Not Found">>;
 responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
 
 
-split_path(#req{path = <<"/", Path/binary>>}) ->
-    binary:split(Path, [<<"/">>], [global, trim]);
 
-split_path(#req{path = Path}) ->
+%%
+%% Helpers for working with a #req{}
+%%
+
+path(#req{path = <<"/", Path/binary>>}) ->
+    binary:split(Path, [<<"/">>], [global, trim]);
+path(#req{path = Path}) ->
     binary:split(Path, [<<"/">>], [global, trim]).
 
 
