@@ -56,19 +56,6 @@ execute_callback(Req, {CallbackMod, CallbackArgs}) ->
     end.
 
 
-chunk_ref(Req) ->
-    Req#req.pid.
-
-send_chunk(Ref, Data) ->
-    Ref ! {chunk, Data, self()},
-    receive
-        {Ref, ok} ->
-            ok;
-        {Ref, {error, Reason}} ->
-            {error, Reason}
-    end.
-
-
 
 responsecode2bin(200) -> <<"HTTP/1.1 200 OK">>;
 responsecode2bin(304) -> <<"HTTP/1.1 304 Not Modified">>;
@@ -82,10 +69,33 @@ responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
 %% Helpers for working with a #req{}
 %%
 
+
+%% @doc: Splits the request path into binary parts useful for
+%% matching. TODO: Should this be done once upfront and cached inside
+%% the #req{}?
 path(#req{path = <<"/", Path/binary>>}) ->
     binary:split(Path, [<<"/">>], [global, trim]);
 path(#req{path = Path}) ->
     binary:split(Path, [<<"/">>], [global, trim]).
+
+
+%% @doc: Returns a reference that can be used to send chunks to the
+%% client. If the protocol does not support it, returns {error,
+%% not_supported}.
+chunk_ref(#req{version = {1, 1}} = Req) ->
+    Req#req.pid;
+chunk_ref(_) ->
+    {error, not_supported}.
+
+
+send_chunk(Ref, Data) ->
+    Ref ! {chunk, Data, self()},
+    receive
+        {Ref, ok} ->
+            ok;
+        {Ref, {error, Reason}} ->
+            {error, Reason}
+    end.
 
 
 
