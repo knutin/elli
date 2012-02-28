@@ -1,7 +1,8 @@
 -module(elli_request).
 -include("elli.hrl").
 
--export([send_chunk/2, chunk_ref/1, path/1, get_header/2]).
+-export([send_chunk/2, chunk_ref/1, path/1, raw_path/1, get_header/2,
+         headers/1]).
 
 %%
 %% Helpers for working with a #req{}
@@ -11,8 +12,14 @@
 path(#req{path = Path}) ->
     Path.
 
+raw_path(#req{raw_path = {abs_path, Path}}) ->
+    Path.
+
 get_header(Key, #req{headers = Headers}) ->
     proplists:get_value(Key, Headers).
+
+headers(#req{headers = Headers}) ->
+    Headers.
 
 
 %% @doc: Returns a reference that can be used to send chunks to the
