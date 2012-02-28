@@ -1,7 +1,9 @@
 -module(elli_request).
 -include("elli.hrl").
 
--export([handle/2, send_chunk/2, chunk_ref/1, path/1]).
+-export([handle/2, send_chunk/2, chunk_ref/1]).
+
+-export([get_header/2, path/1]).
 
 
 -spec handle(#req{}, callback()) -> {response(), connection_token_atom() | chunked}.
@@ -73,6 +75,9 @@ responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
 %% @doc: Returns path split into binary parts.
 path(#req{path = Path}) ->
     Path.
+
+get_header(Key, #req{headers = Headers}) ->
+    proplists:get_value(Key, Headers).
 
 
 %% @doc: Returns a reference that can be used to send chunks to the
