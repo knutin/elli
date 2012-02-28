@@ -104,6 +104,7 @@ send_chunk(Ref, Data) ->
 connection_token(#req{version = {1, 1}, headers = Headers}) ->
     case proplists:get_value(<<"Connection">>, Headers) of
         <<"close">> -> <<"close">>;
+        <<"Close">> -> <<"close">>;
         _           -> <<"Keep-Alive">>
     end;
 
