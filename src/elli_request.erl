@@ -2,7 +2,7 @@
 -include("elli.hrl").
 
 -export([send_chunk/2, chunk_ref/1, path/1, raw_path/1, get_header/2,
-         headers/1]).
+         headers/1, peer/1, method/1]).
 
 %%
 %% Helpers for working with a #req{}
@@ -20,6 +20,12 @@ get_header(Key, #req{headers = Headers}) ->
 
 headers(#req{headers = Headers}) ->
     Headers.
+
+peer(#req{peer = Peer}) ->
+    Peer.
+
+method(#req{method = Method}) ->
+    Method.
 
 
 %% @doc: Returns a reference that can be used to send chunks to the

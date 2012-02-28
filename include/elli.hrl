@@ -35,5 +35,6 @@
           version,
           headers :: headers(),
           body :: body(),
-          pid :: pid()
+          pid :: pid(),
+          peer :: inet:ip_address()
 }).

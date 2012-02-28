@@ -36,7 +36,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     Req = #req{method = Method, path = URL, args = URLArgs, version = V,
                raw_path = RawPath,
                headers = RequestHeaders, body = RequestBody,
-               pid = self()},
+               pid = self(), peer = get_peer(Socket, RequestHeaders)},
 
     case execute_callback(Req, Callback) of
         {ResponseCode, UserHeaders, UserBody} ->
@@ -52,7 +52,8 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             send_response(Socket, ResponseCode, ResponseHeaders, Body, Callback),
 
             t(request_end),
-            Mod:request_complete(Req, ResponseHeaders, Body, get_timings(), Args),
+            Mod:request_complete(Req, ResponseCode, ResponseHeaders, Body,
+                                 get_timings(), Args),
 
             case close_or_keepalive(Req, UserHeaders) of
                 keep_alive ->
@@ -73,7 +74,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             ok = chunk_loop(Socket, Req),
 
             t(request_end),
-            Mod:request_complete(Req, ResponseHeaders, <<>>, get_timings(), Args),
+            Mod:request_complete(Req, 200, ResponseHeaders, <<>>, get_timings(), Args),
             ok
     end.
 
@@ -329,6 +330,20 @@ connection(Req, UserHeaders) ->
     {<<"Connection">>, Token}.
 
 
+get_peer(Socket, Headers) ->
+    case proplists:get_value(<<"X-Forwarded-For">>, Headers) of
+        undefined ->
+            case inet:peername(Socket) of
+                {ok, {Address, _}} ->
+                    list_to_binary(inet_parse:ntoa(Address));
+                {error, _} ->
+                    undefined
+            end;
+        Ip ->
+            Ip
+    end.
+
+
 content_encoding(gzip)    -> {<<"Content-Encoding">>, <<"gzip">>};
 content_encoding(deflate) -> {<<"Content-Encoding">>, <<"deflate">>};
 content_encoding(none)    -> [].
@@ -356,7 +371,8 @@ encode_body(Body, #req{headers = Headers}) ->
                 <<"gzip">>     -> {zlib:gzip(Body), gzip};
                 <<"deflate">>  -> {zlib:compress(Body), deflate};
                 <<"identity">> -> {Body, none};
-                <<>>           -> {Body, none}
+                <<>>           -> {Body, none};
+                _Other         -> {Body, none}
             end;
         false ->
             {Body, none}

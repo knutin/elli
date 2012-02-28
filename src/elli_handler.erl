@@ -7,7 +7,7 @@
     {chunk, headers()} |
     no_return().
 
--callback request_complete(#req{}, headers(), body(),
+-callback request_complete(#req{}, response_code(), headers(), body(),
                            [{atom(), term()}], callback_args()) ->
     ok.
 

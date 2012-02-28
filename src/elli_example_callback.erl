@@ -1,5 +1,5 @@
 -module(elli_example_callback).
--export([handle/2, request_complete/5]).
+-export([handle/2, request_complete/6]).
 -export([request_throw/4, request_exit/4, request_error/4,
          request_parse_error/2]).
 -export([client_closed/2, client_timeout/2]).
@@ -60,7 +60,7 @@ chunk_loop(Ref, N) ->
 
 
 
-request_complete(_Req, _ResponseHeaders, _ResponseBody, _Timings, _Args) ->
+request_complete(_Req, _ResponseCode, _ResponseHeaders, _ResponseBody, _Timings, _Args) ->
     %% io:format(
     %%   "REQUEST: ~s~n"
     %%   "    headers  : ~w us~n"
