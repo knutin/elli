@@ -1,12 +1,11 @@
 -module(elli_request).
 -include("elli.hrl").
 
--export([send_chunk/2, chunk_ref/1, path/1]).
+-export([send_chunk/2, chunk_ref/1, path/1, get_header/2]).
 
 %%
 %% Helpers for working with a #req{}
 %%
-
 
 %% @doc: Returns path split into binary parts.
 path(#req{path = Path}) ->
