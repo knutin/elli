@@ -18,6 +18,9 @@ handle('GET',[<<"hello">>, <<"world">>], _Req) ->
 handle('GET',[<<"headers.html">>], _Req) ->
     {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
 
+handle('GET',[<<"close">>], _Req) ->
+    {ok, [{<<"Connection">>, <<"close">>}], <<"closing">>};
+
 handle('GET', [<<"crash">>], _Req) ->
     throw(foobar);
 

@@ -11,7 +11,8 @@ elli_test_() ->
       ?_test(not_found()),
       ?_test(crash()),
       ?_test(encoding()),
-      ?_test(exception_flow())
+      ?_test(exception_flow()),
+      ?_test(user_connection())
 %%      ?_test(content_length())
      ]}.
 
@@ -76,6 +77,13 @@ exception_flow() ->
     ?assertEqual([{"Connection", "Keep-Alive"},
                   {"Content-Length", "9"}], headers(Response)),
     ?assertEqual(<<"Forbidden">>, body(Response)).
+
+user_connection() ->
+    {ok, Response} = lhttpc:request("http://localhost:8080/close", "GET", [], 1000),
+    ?assertEqual({200, "OK"}, status(Response)),
+    ?assertEqual([{"Connection", "close"},
+                  {"Content-Length", "7"}], headers(Response)),
+    ?assertEqual(<<"closing">>, body(Response)).
 
 
 %% content_length() ->

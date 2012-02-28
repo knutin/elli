@@ -315,19 +315,28 @@ connection_token(#req{version = {1, 0}, headers = Headers}) ->
         _                -> <<"close">>
     end.
 
-close_or_keepalive(Req, _UserHeaders) ->
-    case connection_token(Req) of
-        <<"Keep-Alive">> -> keep_alive;
-        <<"close">>      -> close
+close_or_keepalive(Req, UserHeaders) ->
+    case proplists:get_value(<<"Connection">>, UserHeaders) of
+        undefined ->
+            case connection_token(Req) of
+                <<"Keep-Alive">> -> keep_alive;
+                <<"close">>      -> close
+            end;
+        <<"close">> -> close;
+        <<"Keep-Alive">> -> keep_alive
     end.
 
 
+%% @doc: Adds appropriate connection header if the user did not add
+%% one already.
 connection(Req, UserHeaders) ->
-    Token = case proplists:get_value(<<"Connection">>, UserHeaders) of
-                undefined -> connection_token(Req);
-                T         -> T
-            end,
-    {<<"Connection">>, Token}.
+    case proplists:get_value(<<"Connection">>, UserHeaders) of
+        undefined ->
+            {<<"Connection">>, connection_token(Req)};
+        _ ->
+            []
+    end.
+
 
 
 get_peer(Socket, Headers) ->
