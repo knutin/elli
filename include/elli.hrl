@@ -29,8 +29,9 @@
 
 -record(req, {
           method :: 'GET' | 'POST',
-          path :: binary(),
+          path :: [binary()],
           args,
+          raw_path :: binary(),
           version,
           headers :: headers(),
           body :: body(),

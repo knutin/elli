@@ -28,9 +28,9 @@ accept(Server, ListenSocket, Callback) ->
 %% connection is closed.
 handle_request(Socket, {CallbackMod, CallbackArgs} = Callback) ->
     AcceptStart = now(),
-    {Method, Path, Args, V, Buf0} = get_request(Socket),        RequestStart = now(),
-    {Headers, Buf1}               = get_headers(Socket, V, Buf0), HeadersEnd = now(),
-    Body                          = get_body(Socket, Headers, Buf1), BodyEnd = now(),
+    {Method, RawPath, V, Buf0} = get_request(Socket),        RequestStart = now(),
+    {Headers, Buf1}            = get_headers(Socket, V, Buf0), HeadersEnd = now(),
+    Body                       = get_body(Socket, Headers, Buf1), BodyEnd = now(),
 
     %% Big-ip hack
     case V of
@@ -41,13 +41,15 @@ handle_request(Socket, {CallbackMod, CallbackArgs} = Callback) ->
             ok
     end,
 
-    Req = #req{method = Method, path = Path, args = Args, version = V,
+
+    {URL, Args} = parse_path(RawPath),
+    Req = #req{method = Method, path = URL, args = Args, raw_path = RawPath, version = V,
                headers = Headers, body = Body,
                pid = self()},
 
     case elli_request:handle(Req, Callback) of
         {Response, chunked} ->
-            ok = gen_tcp:send(Socket, Response),
+            send_response(Socket, Response),
             inet:setopts(Socket, [{active, once}]),
             chunk_loop(Socket, Req),
             CallbackMod:request_complete(Req, Response, AcceptStart, RequestStart,
@@ -61,12 +63,14 @@ handle_request(Socket, {CallbackMod, CallbackArgs} = Callback) ->
             ?MODULE:handle_request(Socket, Callback);
         {Response, close} ->
             UserEnd = now(),
-            ok = gen_tcp:send(Socket, Response),
+            send_response(Socket, Response),
             gen_tcp:close(Socket),
             CallbackMod:request_complete(Req, Response, AcceptStart, RequestStart,
                                          HeadersEnd, BodyEnd, UserEnd, now(), CallbackArgs),
             ok
     end.
+
+
 
 send_response(Socket, Response) ->
     case gen_tcp:send(Socket, Response) of
@@ -77,31 +81,41 @@ send_response(Socket, Response) ->
     end.
 
 
+%% @doc: The chunk loop is an intermediary between the socket and the
+%% user. We forward anythingthe user sends until the user sends an
+%% empty response, which signals that the connection should be
+%% closed. When the client closes the socket, the loop sticks around
+%% until the user tries to send something again so we can notify about
+%% the closed socket.
 chunk_loop(Socket, Req) ->
     ?MODULE:chunk_loop(Socket, Req, open).
 
-chunk_loop(Socket, Req, SocketState) ->
+chunk_loop(Socket, Req, open) ->
     receive
         {tcp_closed, Socket} ->
             io:format("client closed socket~n"),
             ?MODULE:chunk_loop(Socket, Req, closed);
 
-        {chunk, <<>>, From} when SocketState =:= open ->
+        {chunk, <<>>, From} ->
             ok = gen_tcp:send(Socket, <<"0\r\n\r\n">>),
             gen_tcp:close(Socket),
             From ! {self(), ok};
 
-        {chunk, Data, From} when SocketState =:= open ->
+        {chunk, Data, From} ->
             Size = integer_to_list(iolist_size(Data), 16),
             Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
             From ! {self(), gen_tcp:send(Socket, Response)},
-            ?MODULE:chunk_loop(Socket, Req, SocketState);
-
-        {chunk, _, From} when SocketState =:= closed ->
-            From ! {self(), {error, closed}}
-
+            ?MODULE:chunk_loop(Socket, Req, open)
     after 1000 ->
-            ?MODULE:chunk_loop(Socket, Req, SocketState)
+            ?MODULE:chunk_loop(Socket, Req, open)
+    end;
+
+chunk_loop(Socket, Req, closed) ->
+    receive
+        {chunk, _, From} ->
+            From ! {self(), {error, closed}}
+    after 1000 ->
+            ?MODULE:chunk_loop(Socket, Req, closed)
     end.
 
 
@@ -114,9 +128,8 @@ get_request(Socket, Buffer) ->
         {ok, Data} ->
             NewBuffer = <<Buffer/binary, Data/binary>>,
             case erlang:decode_packet(http_bin, NewBuffer, []) of
-                {ok, {http_request, Method, Path, Version}, Rest} ->
-                    {URI, Args} = parse_path(Path),
-                    {Method, URI, Args, Version, Rest};
+                {ok, {http_request, Method, RawPath, Version}, Rest} ->
+                    {Method, RawPath, Version, Rest};
                 {ok, {http_error, Bin}, Rest} ->
                     error_logger:info_msg("Error parsing request: ~p~n", [{Bin, Rest, NewBuffer}]),
                     error_terminate(400, Socket);
@@ -142,9 +155,17 @@ error_terminate(_Code, Socket) ->
 
 parse_path({abs_path, FullPath}) ->
     case binary:split(FullPath, [<<"?">>]) of
-        [URI]       -> {URI, <<>>};
-        [URI, Args] -> {URI, Args}
+        [URL]       -> {split_path(URL), <<>>};
+        [URL, Args] -> {split_path(URL), Args}
     end.
+
+split_path(<<"/", Path/binary>>) ->
+    binary:split(Path, [<<"/">>], [global, trim]);
+split_path(Path) ->
+    binary:split(Path, [<<"/">>], [global, trim]).
+
+
+
 
 -spec get_headers(port(), term(), binary()) -> headers().
 get_headers(_Socket, {0, 9}, _) ->
@@ -164,6 +185,9 @@ get_headers(Socket, Buffer, Headers, HeadersCount) ->
                 {ok, Data} ->
                     get_headers(Socket, <<Buffer/binary, Data/binary>>,
                                 Headers, HeadersCount);
+                {error, closed} ->
+                    gen_tcp:close(Socket),
+                    exit(normal);
                 {error, timeout} ->
                     error_logger:info_msg("timeout in getting headers~n"),
                     gen_tcp:close(Socket),

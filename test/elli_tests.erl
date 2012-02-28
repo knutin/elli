@@ -11,7 +11,6 @@ elli_test_() ->
       ?_test(not_found()),
       ?_test(crash()),
       ?_test(encoding()),
-      ?_test(split_path()),
       ?_test(exception_flow())
 %%      ?_test(content_length())
      ]}.
@@ -61,10 +60,6 @@ crash() ->
     ?assertEqual(<<"Internal server error">>, body(Response)),
     stop(S).
 
-
-split_path() ->
-    ?assertEqual([<<"foo">>, <<"bar">>],
-                 elli_request:path(#req{path = <<"/foo/bar/">>})).
 
 encoding() ->
     S = s(),

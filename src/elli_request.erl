@@ -70,13 +70,9 @@ responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
 %%
 
 
-%% @doc: Splits the request path into binary parts useful for
-%% matching. TODO: Should this be done once upfront and cached inside
-%% the #req{}?
-path(#req{path = <<"/", Path/binary>>}) ->
-    binary:split(Path, [<<"/">>], [global, trim]);
+%% @doc: Returns path split into binary parts.
 path(#req{path = Path}) ->
-    binary:split(Path, [<<"/">>], [global, trim]).
+    Path.
 
 
 %% @doc: Returns a reference that can be used to send chunks to the
