@@ -3,8 +3,6 @@
 
 -export([send_chunk/2, chunk_ref/1, path/1]).
 
-
-
 %%
 %% Helpers for working with a #req{}
 %%
@@ -13,6 +11,9 @@
 %% @doc: Returns path split into binary parts.
 path(#req{path = Path}) ->
     Path.
+
+get_header(Key, #req{headers = Headers}) ->
+    proplists:get_value(Key, Headers).
 
 
 %% @doc: Returns a reference that can be used to send chunks to the
