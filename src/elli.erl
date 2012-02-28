@@ -90,5 +90,5 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 start_acceptor(Socket, Callback) ->
-    elli_acceptor:start_link(self(), Socket, Callback).
+    elli_http:start_link(self(), Socket, Callback).
 

@@ -1,11 +1,12 @@
 -module(elli_example_callback).
--export([handle/2, request_complete/9]).
--export([request_throw/4, request_exit/4, request_error/4]).
+-export([handle/2, request_complete/5]).
+-export([request_throw/4, request_exit/4, request_error/4,
+         request_parse_error/2]).
+-export([client_closed/2, client_timeout/2]).
 -export([chunk_loop/1]).
+
 -include("elli.hrl").
 -behaviour(elli_handler).
-
-%% TODO: Turn into behaviour. Use callback return specs from R15.
 
 
 handle(Req, _Args) ->
@@ -59,8 +60,7 @@ chunk_loop(Ref, N) ->
 
 
 
-request_complete(_Req, _Response, _AcceptStart, _RequestStart,
-                 _HeadersEnd, _BodyEnd, _UserEnd, _RequestEnd, _Args) ->
+request_complete(_Req, _ResponseHeaders, _ResponseBody, _Timings, _Args) ->
     %% io:format(
     %%   "REQUEST: ~s~n"
     %%   "    headers  : ~w us~n"
@@ -77,11 +77,9 @@ request_complete(_Req, _Response, _AcceptStart, _RequestStart,
 
     ok.
 
-request_throw(_Req, _Exception, _Stack, _Args) ->
-    ok.
-
-request_exit(_Req, _Exit, _Stack, _Args) ->
-    ok.
-
-request_error(_Req, _Error, _Stack, _Args) ->
-    ok.
+request_throw(_Req, _Exception, _Stack, _Args) -> ok.
+request_exit(_Req, _Exit, _Stack, _Args)       -> ok.
+request_error(_Req, _Error, _Stack, _Args)     -> ok.
+request_parse_error(_Data, _Args)              -> ok.
+client_closed(_When, _Args)                    -> ok.
+client_timeout(_When, _Args)                   -> ok.

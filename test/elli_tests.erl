@@ -5,7 +5,7 @@
 
 elli_test_() ->
     {setup,
-     fun start_deps/0, fun stop_deps/1,
+     fun setup/0, fun teardown/1,
      [
       ?_test(hello_world()),
       ?_test(not_found()),
@@ -17,52 +17,44 @@ elli_test_() ->
 
 
 
-start_deps() ->
+setup() ->
     application:start(crypto),
     application:start(public_key),
     application:start(ssl),
-    ok = lhttpc:start().
-
-stop_deps(_) ->
-    ok = lhttpc:stop().
-
-s() ->
+    ok = lhttpc:start(),
     {ok, P} = elli:start_link([{callback, elli_example_callback}]),
     unlink(P),
-    P.
+    [P].
+
+teardown(Pids) ->
+    [elli:stop(P) || P <- Pids].
 
 hello_world() ->
-    S = s(),
     URL = "http://localhost:8080/hello/world",
     {ok, Response} = lhttpc:request(URL, "GET", [], 1000),
     ?assertEqual({200, "OK"}, status(Response)),
     ?assertEqual([{"Connection", "Keep-Alive"},
                   {"Content-Length", "12"}], headers(Response)),
-    ?assertEqual(<<"Hello World!">>, body(Response)),
-    stop(S).
+    ?assertEqual(<<"Hello World!">>, body(Response)).
+
 
 
 not_found() ->
-    S = s(),
     {ok, Response} = lhttpc:request("http://localhost:8080/foobarbaz", "GET", [], 1000),
     ?assertEqual({404, "Not Found"}, status(Response)),
     ?assertEqual([{"Connection", "Keep-Alive"},
                   {"Content-Length", "4"}], headers(Response)),
-    ?assertEqual(<<"body">>, body(Response)),
-    stop(S).
+    ?assertEqual(<<"body">>, body(Response)).
 
 crash() ->
-    S = s(),
     {ok, Response} = lhttpc:request("http://localhost:8080/crash", "GET", [], 1000),
     ?assertEqual({500, "Internal Server Error"}, status(Response)),
     ?assertEqual([{"Connection", "Keep-Alive"},
                   {"Content-Length", "21"}], headers(Response)),
-    ?assertEqual(<<"Internal server error">>, body(Response)),
-    stop(S).
+    ?assertEqual(<<"Internal server error">>, body(Response)).
 
 
 encoding() ->
-    S = s(),
     {ok, Response} = lhttpc:request("http://localhost:8080/compressed", "GET",
                                     [{"Accept-Encoding", "gzip"}], 1000),
     ?assertEqual({200, "OK"}, status(Response)),
@@ -75,17 +67,15 @@ encoding() ->
     ?assertEqual({200, "OK"}, status(Response1)),
     ?assertEqual([{"Connection", "Keep-Alive"},
                   {"Content-Length", "1032"}], headers(Response1)),
-    ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response1)),
-    stop(S).
+    ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response1)).
+
 
 exception_flow() ->
-    S = s(),
     {ok, Response} = lhttpc:request("http://localhost:8080/403", "GET", [], 1000),
     ?assertEqual({403, "Forbidden"}, status(Response)),
     ?assertEqual([{"Connection", "Keep-Alive"},
                   {"Content-Length", "9"}], headers(Response)),
-    ?assertEqual(<<"Forbidden">>, body(Response)),
-    stop(S).
+    ?assertEqual(<<"Forbidden">>, body(Response)).
 
 
 %% content_length() ->
@@ -112,7 +102,3 @@ body({_, _, Body}) ->
 
 headers({_, Headers, _}) ->
     lists:sort(Headers).
-
-
-stop(S) ->
-    ok = elli:stop(S).

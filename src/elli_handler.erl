@@ -7,16 +7,14 @@
     {chunk, headers()} |
     no_return().
 
--callback request_complete(#req{}, response(),
-                           AcceptStart :: timestamp(),
-                           RequestStart :: timestamp(),
-                           HeadersEnd :: timestamp(),
-                           BodyEnd :: timestamp(),
-                           UserEnd :: timestamp(),
-                           RequestEnd :: timestamp(),
-                           callback_args()) ->
+-callback request_complete(#req{}, headers(), body(),
+                           [{atom(), term()}], callback_args()) ->
     ok.
 
 -callback request_throw(#req{}, term(), term(), callback_args()) -> ok.
 -callback request_exit(#req{}, term(), term(), callback_args()) -> ok.
 -callback request_error(#req{}, term(), term(), callback_args()) -> ok.
+-callback request_parse_error(binary(), callback_args()) -> ok.
+-callback client_closed(term(), callback_args()) -> ok.
+-callback client_timeout(term(), callback_args()) -> ok.
+
