@@ -240,7 +240,7 @@ get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
             case gen_tcp:recv(Socket, 0, 10000) of
                 {ok, Data} ->
                     get_headers(Socket, <<Buffer/binary, Data/binary>>,
-                                Headers, HeadersCount);
+                                Headers, HeadersCount, Callback);
                 {error, closed} ->
                     Mod:client_closed(receiving_headers, Args),
                     gen_tcp:close(Socket),
