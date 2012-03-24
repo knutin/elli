@@ -209,7 +209,7 @@ get_timings() ->
 
 parse_path({abs_path, FullPath}) ->
     case binary:split(FullPath, [<<"?">>]) of
-        [URL]       -> {split_path(URL), <<>>};
+        [URL]       -> {split_path(URL), []};
         [URL, Args] -> {split_path(URL), split_args(Args)}
     end.
 
