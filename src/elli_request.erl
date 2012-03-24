@@ -21,6 +21,8 @@ get_header(Key, #req{headers = Headers}) ->
 get_arg(Key, #req{} = Req) ->
     get_arg(Key, Req, undefined).
 
+get_arg(_Key, #req{args = []}, Default) ->
+    Default;
 get_arg(Key, #req{args = Args}, Default) ->
     proplists:get_value(Key, Args, Default).
 
