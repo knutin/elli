@@ -210,7 +210,7 @@ get_timings() ->
 parse_path({abs_path, FullPath}) ->
     case binary:split(FullPath, [<<"?">>]) of
         [URL]       -> {split_path(URL), <<>>};
-        [URL, Args] -> {split_path(URL), Args}
+        [URL, Args] -> {split_path(URL), split_args(Args)}
     end.
 
 split_path(<<"/", Path/binary>>) ->
@@ -218,6 +218,20 @@ split_path(<<"/", Path/binary>>) ->
 split_path(Path) ->
     binary:split(Path, [<<"/">>], [global, trim]).
 
+
+
+
+%% @doc: Splits the url arguments into a proplist. Lifted from
+%% cowboy_http:x_www_form_urlencoded/2
+-spec split_args(binary()) -> list({binary(), binary() | true}).
+split_args(<<>>) ->
+	[];
+split_args(Qs) ->
+	Tokens = binary:split(Qs, <<"&">>, [global, trim]),
+	[case binary:split(Token, <<"=">>) of
+		[Token] -> {Token, true};
+		[Name, Value] -> {Name, Value}
+	end || Token <- Tokens].
 
 %%
 %% RECEIVE REQUEST

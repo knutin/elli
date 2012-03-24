@@ -12,7 +12,8 @@ elli_test_() ->
       ?_test(crash()),
       ?_test(encoding()),
       ?_test(exception_flow()),
-      ?_test(user_connection())
+      ?_test(user_connection()),
+      ?_test(get_args())
 %%      ?_test(content_length())
      ]}.
 
@@ -84,6 +85,12 @@ user_connection() ->
     ?assertEqual([{"Connection", "close"},
                   {"Content-Length", "7"}], headers(Response)),
     ?assertEqual(<<"closing">>, body(Response)).
+
+
+get_args() ->
+    {ok, Response} = lhttpc:request("http://localhost:8080/hello?name=knut",
+                                    "GET", [], 1000),
+    ?assertEqual(<<"Hello knut">>, body(Response)).
 
 
 %% content_length() ->
