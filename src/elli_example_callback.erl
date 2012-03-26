@@ -18,6 +18,10 @@ handle('GET',[<<"hello">>, <<"world">>], _Req) ->
 handle('GET',[<<"headers.html">>], _Req) ->
     {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
 
+handle('GET', [<<"hello">>], Req) ->
+    Name = elli_request:get_arg(<<"name">>, Req),
+    {ok, [], <<"Hello ", Name/binary>>};
+
 handle('GET',[<<"close">>], _Req) ->
     {ok, [{<<"Connection">>, <<"close">>}], <<"closing">>};
 
