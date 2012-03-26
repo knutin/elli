@@ -1,4 +1,4 @@
-## elli - experimental web server
+# elli - experimental web server
 
 The purpose of this project is to try out a few experiments in the
 core of the web server loop to create a webserver that is as robust
@@ -26,3 +26,19 @@ Non-goals:
  * Normal webserver features like html templating, session handling
  * Virtual hosts, binding to ip addresses
 
+
+## Usage
+
+    $: rebar get-deps
+    $: rebar compile
+    $: erl -pa ebin
+
+    % starting elli
+    1>: {ok, Pid} = elli:start_link([{callback, elli_example_callback}, {port, 3000}]).
+
+    % stopping elli
+    2>: elli:stop(Pid).
+
+## Callback module
+
+see examples/my_example_callback.erl
