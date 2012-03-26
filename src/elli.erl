@@ -38,8 +38,9 @@ init([Opts]) ->
     process_flag(trap_exit, true),
     Callback = proplists:get_value(callback, Opts), %% TODO: Check if handle/1 is exported
     CallbackArgs = proplists:get_value(callback_args, Opts),
+    Port = proplists:get_value(port, Opts, 8080),
 
-    {ok, Socket} = gen_tcp:listen(8080, [binary,
+    {ok, Socket} = gen_tcp:listen(Port, [binary,
                                          {reuseaddr, true},
                                          {backlog, 32768},
                                          {packet, raw},
