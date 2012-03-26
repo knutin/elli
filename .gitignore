@@ -1,3 +1,4 @@
 deps/**
 ebin/**
 *.beam
+.eunit
