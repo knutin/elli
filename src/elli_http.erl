@@ -71,7 +71,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                                | UserHeaders],
             send_response(Socket, 200, ResponseHeaders, <<>>, Callback),
 
-            ok = chunk_loop(Socket, Req),
+            chunk_loop(Socket, Req),
 
             t(request_end),
             Mod:request_complete(Req, 200, ResponseHeaders, <<>>, get_timings(), Args),
