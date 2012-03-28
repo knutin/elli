@@ -142,15 +142,25 @@ chunk_loop(Socket, Req, open) ->
             ?MODULE:chunk_loop(Socket, Req, closed);
 
         {chunk, <<>>, From} ->
-            ok = gen_tcp:send(Socket, <<"0\r\n\r\n">>),
-            gen_tcp:close(Socket),
-            From ! {self(), ok},
-            ok;
+            case gen_tcp:send(Socket, <<"0\r\n\r\n">>) of
+                ok ->
+                    gen_tcp:close(Socket),
+                    From ! {self(), ok},
+                    ok;
+                {error, closed} ->
+                    From ! {self(), {error, closed}},
+                    ok
+            end;
 
         {chunk, Data, From} ->
             Size = integer_to_list(iolist_size(Data), 16),
             Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
-            From ! {self(), gen_tcp:send(Socket, Response)},
+            case gen_tcp:send(Socket, Response) of
+                ok ->
+                    From ! {self(), ok};
+                {error, closed} ->
+                    From ! {self(), {error, closed}}
+            end,
             ?MODULE:chunk_loop(Socket, Req, open)
     after 1000 ->
             ?MODULE:chunk_loop(Socket, Req, open)
