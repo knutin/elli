@@ -9,29 +9,55 @@
 -behaviour(elli_handler).
 
 
+%%
+%% ELLI REQUEST CALLBACK
+%%
+
 handle(Req, _Args) ->
+    %% Delegate to our handler function
     handle(Req#req.method, elli_request:path(Req), Req).
 
+
+
+%% Route METHOD & PATH to the appropriate clause
 handle('GET',[<<"hello">>, <<"world">>], _Req) ->
+    %% Reply with a normal response. 'ok' can be used instead of '200'
+    %% to signal success.
     {ok, [], <<"Hello World!">>};
 
-handle('GET',[<<"headers.html">>], _Req) ->
-    {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
-
 handle('GET', [<<"hello">>], Req) ->
+    %% Fetch a get argument from the URL.
     Name = elli_request:get_arg(<<"name">>, Req),
     {ok, [], <<"Hello ", Name/binary>>};
 
+handle('GET',[<<"headers.html">>], _Req) ->
+    %% Set custom headers, for example 'Content-Type'
+    {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
+
 handle('GET',[<<"close">>], _Req) ->
+    %% Set a custom connection header. Elli will by default use
+    %% keep-alive if the browser supports it, this will override that
+    %% behaviour.
     {ok, [{<<"Connection">>, <<"close">>}], <<"closing">>};
 
 handle('GET', [<<"crash">>], _Req) ->
+    %% Throwing an exception results in a 500 response and
+    %% request_throw being called
     throw(foobar);
 
 handle('GET', [<<"compressed">>], _Req) ->
+    %% Body with a byte size over 1024 are automatically gzipped
     {ok, [], binary:copy(<<"Hello World!">>, 86)};
 
 handle('GET', [<<"chunked">>], Req) ->
+    %% Start a chunked response for streaming real-time events to the
+    %% browser.
+    %%
+    %% Calling elli_request:send_chunk(ChunkRef, Body) will send that
+    %% chunk to the client. An empty body will close the
+    %% connection. See chunk_loop/1 below.
+    %%
+    %% Return immediately {chunk, Headers} to signal we want to chunk.
     Ref = elli_request:chunk_ref(Req),
     spawn(fun() -> ?MODULE:chunk_loop(Ref) end),
     {chunk, []};
@@ -40,6 +66,9 @@ handle('GET', [<<"304">>], _Req) ->
     {304, [], <<>>};
 
 handle('GET', [<<"403">>], _Req) ->
+    %% Exceptions formatted as return codes can be used to
+    %% short-circuit a response, for example in case of
+    %% authentication/authorization
     throw({403, [], <<"Forbidden">>});
 
 handle(_, _, _Req) ->
@@ -47,15 +76,18 @@ handle(_, _, _Req) ->
 
 
 
-
+%% Send 10 separate chunks to the client.
 chunk_loop(Ref) ->
     chunk_loop(Ref, 10).
 
 chunk_loop(Ref, 0) ->
+    %% Send empty chunk to make elli close the connection
     elli_request:send_chunk(Ref, <<>>);
 chunk_loop(Ref, N) ->
     timer:sleep(1000),
 
+    %% Send a chunk to the client, check for errors as the user might
+    %% have disconnected
     case elli_request:send_chunk(Ref, [<<"chunk">>, integer_to_list(N)]) of
         ok -> ok;
         {error, Reason} ->
@@ -65,25 +97,12 @@ chunk_loop(Ref, N) ->
     chunk_loop(Ref, N-1).
 
 
+%%
+%% ELLI EVENT CALLBACKS
+%%
 
 
-request_complete(_Req, _ResponseCode, _ResponseHeaders, _ResponseBody, _Timings, _Args) ->
-    %% io:format(
-    %%   "REQUEST: ~s~n"
-    %%   "    headers  : ~w us~n"
-    %%   "    body     : ~w us~n"
-    %%   "    user     : ~w us~n"
-    %%   "    response : ~w us~n"
-    %%   "    total    : ~w us~n",
-    %%   [Req#req.path,
-    %%    timer:now_diff(HeadersEnd, RequestStart),
-    %%    timer:now_diff(BodyEnd, HeadersEnd),
-    %%    timer:now_diff(UserEnd, BodyEnd),
-    %%    timer:now_diff(RequestEnd, UserEnd),
-    %%    timer:now_diff(RequestEnd, RequestStart)]),
-
-    ok.
-
+request_complete(_Req, _ResponseCode, _ResponseHeaders, _ResponseBody, _Timings, _Args) -> ok.
 request_throw(_Req, _Exception, _Stack, _Args) -> ok.
 request_exit(_Req, _Exit, _Stack, _Args)       -> ok.
 request_error(_Req, _Error, _Stack, _Args)     -> ok.
