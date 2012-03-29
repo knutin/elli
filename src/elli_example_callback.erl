@@ -1,8 +1,5 @@
 -module(elli_example_callback).
--export([handle/2, request_complete/6]).
--export([request_throw/4, request_exit/4, request_error/4,
-         request_parse_error/2]).
--export([client_closed/2, client_timeout/2]).
+-export([handle/2, handle_event/3]).
 -export([chunk_loop/1]).
 
 -include("elli.hrl").
@@ -101,11 +98,7 @@ chunk_loop(Ref, N) ->
 %% ELLI EVENT CALLBACKS
 %%
 
-
-request_complete(_Req, _ResponseCode, _ResponseHeaders, _ResponseBody, _Timings, _Args) -> ok.
-request_throw(_Req, _Exception, _Stack, _Args) -> ok.
-request_exit(_Req, _Exit, _Stack, _Args)       -> ok.
-request_error(_Req, _Error, _Stack, _Args)     -> ok.
-request_parse_error(_Data, _Args)              -> ok.
-client_closed(_When, _Args)                    -> ok.
-client_timeout(_When, _Args)                   -> ok.
+%% @doc: Handle request events, like request completed, exception
+%% thrown, client timeout, etc. Must return 'ok'.
+handle_event(_Event, _Data, _Args) ->
+    ok.
