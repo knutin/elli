@@ -1,21 +1,23 @@
-# elli - experimental web server
+# elli - Erlang web server for HTTP APIs
 
-The purpose of this project is to try out a few experiments in the
-core of the web server loop to create a webserver that is as robust
-and performant as it can be.
+This project is experimenting with a different core architecture to
+create a webserver that can be the building block for a massive
+throughput, low latency HTTP API. If robustness and performance is
+more important than a wide feature set, then `elli` might be for you.
 
+It is used in production at Wooga.
 
 Goals:
 
+ * Simple
  * Robustness
- * As minimalistic as can be, without sacrificing robustness and correctness
+ * Performance
  * Not use more processes or messages than absolutely required
  * Upgrade without restart
  * Chunked transfer
  * Well tested
  * Traceability
  * Metrics, stats, hooks
- * Gzip compression for replies over a certain size
 
 Non-goals:
 
