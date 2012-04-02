@@ -1,0 +1,5 @@
+language: erlang
+notifications:
+  email: knutin@gmail.com
+otp_release:
+  - R15B

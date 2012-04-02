@@ -7,14 +7,12 @@
     {chunk, headers()} |
     no_return().
 
--callback request_complete(#req{}, response_code(), headers(), body(),
-                           [{atom(), term()}], callback_args()) ->
-    ok.
+-type request_event() :: request_complete
+                       | request_throw
+                       | request_exit
+                       | request_error
+                       | request_parse_error
+                       | client_closed
+                       | client_timeout.
 
--callback request_throw(#req{}, term(), term(), callback_args()) -> ok.
--callback request_exit(#req{}, term(), term(), callback_args()) -> ok.
--callback request_error(#req{}, term(), term(), callback_args()) -> ok.
--callback request_parse_error(binary(), callback_args()) -> ok.
--callback client_closed(term(), callback_args()) -> ok.
--callback client_timeout(term(), callback_args()) -> ok.
-
+-callback handle_event(request_event(), list(), callback_args()) -> ok.

@@ -40,6 +40,8 @@ init([Opts]) ->
     CallbackArgs = proplists:get_value(callback_args, Opts),
     Port = proplists:get_value(port, Opts, 8080),
 
+    ok = Callback:handle_event(elli_startup, [], CallbackArgs),
+
     {ok, Socket} = gen_tcp:listen(Port, [binary,
                                          {reuseaddr, true},
                                          {backlog, 32768},

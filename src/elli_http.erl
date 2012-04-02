@@ -52,8 +52,9 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             send_response(Socket, ResponseCode, ResponseHeaders, Body, Callback),
 
             t(request_end),
-            Mod:request_complete(Req, ResponseCode, ResponseHeaders, Body,
-                                 get_timings(), Args),
+            Mod:handle_event(request_complete,
+                             [Req, ResponseCode, ResponseHeaders, Body, get_timings()],
+                             Args),
 
             case close_or_keepalive(Req, UserHeaders) of
                 keep_alive ->
@@ -74,7 +75,9 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             chunk_loop(Socket, Req),
 
             t(request_end),
-            Mod:request_complete(Req, 200, ResponseHeaders, <<>>, get_timings(), Args),
+            Mod:handle_event(request_complete,
+                             [Req, 200, ResponseHeaders, <<>>, get_timings()],
+                             Args),
             ok
     end.
 
@@ -88,7 +91,7 @@ send_response(Socket, Code, Headers, Body, {Mod, Args}) ->
     case gen_tcp:send(Socket, Response) of
         ok -> ok;
         {error, closed} ->
-            Mod:client_closed(before_response, Args),
+            Mod:handle_event(client_closed, [before_response], Args),
             ok
     end.
 
@@ -103,13 +106,15 @@ execute_callback(Req, {Mod, Args}) ->
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             {ResponseCode, Headers, Body};
         throw:Exception ->
-            Mod:request_throw(Req, Exception, erlang:get_stacktrace(), Args),
+            Mod:handle_event(request_throw, [Req, Exception, erlang:get_stacktrace()], Args),
             {500, [], <<"Internal server error">>};
         error:Error ->
-            Mod:request_error(Req, Error, erlang:get_stacktrace(), Args),
+            Mod:handle_event(request_error, [Req, Error, erlang:get_stacktrace()], Args),
+            error_logger:info_msg("error: ~p~n", [Error]),
             {500, [], <<"Internal server error">>};
         exit:Exit ->
-            Mod:request_exit(Req, Exit, erlang:get_stacktrace(), Args),
+            Mod:handle_event(request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
+            error_logger:info_msg("exit: ~p~n", [Exit]),
             {500, [], <<"Internal server error">>}
     end.
 
@@ -187,7 +192,7 @@ get_request(Socket, Buffer, {Mod, Args} = Callback) ->
                 {ok, {http_request, Method, RawPath, Version}, Rest} ->
                     {Method, RawPath, Version, Rest};
                 {ok, {http_error, _}, _} ->
-                    Mod:request_parse_error(NewBuffer, Args),
+                    Mod:handle_event(request_parse_error, [NewBuffer], Args),
                     error_terminate(400, Socket);
                 {more, _} ->
                     get_request(Socket, NewBuffer, Callback)
@@ -268,11 +273,11 @@ get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
                     get_headers(Socket, <<Buffer/binary, Data/binary>>,
                                 Headers, HeadersCount, Callback);
                 {error, closed} ->
-                    Mod:client_closed(receiving_headers, Args),
+                    Mod:handle_event(client_closed, [receiving_headers], Args),
                     gen_tcp:close(Socket),
                     exit(normal);
                 {error, timeout} ->
-                    Mod:client_timeout(receiving_headers, Args),
+                    Mod:handle_event(client_timeout, [receiving_headers], Args),
                     gen_tcp:close(Socket),
                     exit(normal)
             end
@@ -295,11 +300,11 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
                         {ok, Data} ->
                             <<Buffer/binary, Data/binary>>;
                         {error, closed} ->
-                            Mod:client_closed(receiving_body, Args),
+                            Mod:handle_event(client_closed, [receiving_body], Args),
                             ok = gen_tcp:close(Socket),
                             exit(normal);
                         {error, timeout} ->
-                            Mod:client_timeout(receiving_body, Args),
+                            Mod:handle_event(client_timeout, [receiving_body], Args),
                             ok = gen_tcp:close(Socket),
                             exit(normal)
                     end
