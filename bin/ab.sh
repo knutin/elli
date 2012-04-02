@@ -1,3 +1,3 @@
 #!/bin/bash
 
-ab -c 10 -n 10000000 http://localhost:8080/foobar/baz/quux
+ab -c 50 -n 1000000 http://localhost:8080/hello?name=knut
