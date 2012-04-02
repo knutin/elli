@@ -2,7 +2,8 @@
 -include("elli.hrl").
 
 -export([send_chunk/2, chunk_ref/1, path/1, raw_path/1, get_header/2,
-         get_arg/2, get_arg/3, headers/1, peer/1, method/1, body/1]).
+         get_arg/2, get_arg/3, headers/1, peer/1, method/1, body/1,
+         get_header/3]).
 
 %%
 %% Helpers for working with a #req{}
@@ -18,6 +19,9 @@ body(#req{body = Body})                     -> Body.
 
 get_header(Key, #req{headers = Headers}) ->
     proplists:get_value(Key, Headers).
+
+get_header(Key, #req{headers = Headers}, Default) ->
+    proplists:get_value(Key, Headers, Default).
 
 get_arg(Key, #req{} = Req) ->
     get_arg(Key, Req, undefined).
