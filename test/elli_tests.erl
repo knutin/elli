@@ -10,7 +10,7 @@ elli_test_() ->
       ?_test(hello_world()),
       ?_test(not_found()),
       ?_test(crash()),
-      ?_test(encoding()),
+      %% ?_test(no_compress()),
       ?_test(exception_flow()),
       ?_test(user_connection()),
       ?_test(get_args())
@@ -26,6 +26,7 @@ setup() ->
     lhttpc:start(),
     {ok, P} = elli:start_link([{callback, elli_example_callback}]),
     unlink(P),
+    register(elli, P),
     [P].
 
 teardown(Pids) ->
@@ -56,21 +57,13 @@ crash() ->
     ?assertEqual(<<"Internal server error">>, body(Response)).
 
 
-encoding() ->
-    {ok, Response} = lhttpc:request("http://localhost:8080/compressed", "GET",
-                                    [{"Accept-Encoding", "gzip"}], 1000),
-    ?assertEqual({200, "OK"}, status(Response)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Encoding", "gzip"},
-                  {"Content-Length", "41"}], headers(Response)),
-    ?assertEqual(binary:copy(<<"Hello World!">>, 86), zlib:gunzip(body(Response))),
-
-    {ok, Response1} = lhttpc:request("http://localhost:8080/compressed", "GET", [], 1000),
-    ?assertEqual({200, "OK"}, status(Response1)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "1032"}], headers(Response1)),
-    ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response1)).
-
+%% no_compress() ->
+%%     {ok, Response} = lhttpc:request("http://localhost:8080/compressed", "GET",
+%%                                     [{"Accept-Encoding", "gzip"}], 1000),
+%%     ?assertEqual({200, "OK"}, status(Response)),
+%%     ?assertEqual([{"Connection", "Keep-Alive"},
+%%                   {"Content-Length", "1032"}], headers(Response)),
+%%     ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response)).
 
 exception_flow() ->
     {ok, Response} = lhttpc:request("http://localhost:8080/403", "GET", [], 1000),

@@ -41,19 +41,17 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     case execute_callback(Req, Callback) of
         {ResponseCode, UserHeaders, UserBody} ->
             t(user_end),
-            {Body, Encoding} = encode_body(UserBody, Req),
 
             ResponseHeaders = [
                                connection(Req, UserHeaders),
-                               content_length(Body),
-                               content_encoding(Encoding)
+                               content_length(UserBody)
                                | UserHeaders
                               ],
-            send_response(Socket, ResponseCode, ResponseHeaders, Body, Callback),
+            send_response(Socket, ResponseCode, ResponseHeaders, UserBody, Callback),
 
             t(request_end),
             Mod:handle_event(request_complete,
-                             [Req, ResponseCode, ResponseHeaders, Body, get_timings()],
+                             [Req, ResponseCode, ResponseHeaders, UserBody, get_timings()],
                              Args),
 
             case close_or_keepalive(Req, UserHeaders) of
@@ -384,42 +382,8 @@ get_peer(Socket, Headers) ->
     end.
 
 
-content_encoding(gzip)    -> {<<"Content-Encoding">>, <<"gzip">>};
-content_encoding(deflate) -> {<<"Content-Encoding">>, <<"deflate">>};
-content_encoding(none)    -> [].
-
 content_length(Body) ->
     case size(Body) of
         0 -> [];
         N -> {<<"Content-Length">>, N}
     end.
-
-
-accepted_encoding(Headers) ->
-    Encodings = binary:split(
-                  proplists:get_value(<<"Accept-Encoding">>, Headers, <<>>),
-                  [<<",">>, <<";">>], [global]),
-    case Encodings of
-        [E] -> E;
-        [E|_] -> E
-    end.
-
-encode_body(Body, #req{headers = Headers}) ->
-    case should_compress(Body) of
-        true ->
-            case accepted_encoding(Headers) of
-                <<"gzip">>     -> {zlib:gzip(Body), gzip};
-                <<"deflate">>  -> {zlib:compress(Body), deflate};
-                <<"identity">> -> {Body, none};
-                <<>>           -> {Body, none};
-                _Other         -> {Body, none}
-            end;
-        false ->
-            {Body, none}
-    end.
-
-
-should_compress(Body) when byte_size(Body) >= 1024 -> true;
-should_compress(_)                                 -> false.
-
-

@@ -3,11 +3,21 @@
 -export([handle/2, handle_event/3]).
 
 
-handle(Req, Config) ->
-    forward_request(Req, mods(Config)).
+handle(CleanReq, Config) ->
+    Mods = mods(Config),
+    PreReq = preprocess(CleanReq, Mods),
+    Res    = process(PreReq, Mods),
+    postprocess(PreReq, Res, lists:reverse(Mods)).
 
+
+
+handle_event(elli_startup, Args, Config) ->
+    lists:foreach(fun code:ensure_loaded/1, lists:map(fun ({M, _}) -> M end,
+                                                      mods(Config))),
+    forward_event(elli_startup, Args, mods(Config));
 handle_event(Event, Args, Config) ->
-    forward_event(Event, Args, mods(Config)).
+    forward_event(Event, Args, Config).
+
 
 
 
@@ -15,23 +25,54 @@ handle_event(Event, Args, Config) ->
 %% MIDDLEWARE LOGIC
 %%
 
-forward_request(_Req, []) ->
+process(_Req, []) ->
     {404, [], <<"Not Found">>};
-forward_request(Req, [{Mod, Args} | Mods]) ->
-    case Mod:handle(Req, Args) of
-        ignore ->
-            forward_request(Req, Mods);
-        {forward, NewReq} ->
-            forward_request(NewReq, Mods);
-        Response ->
-            Response
+process(Req, [{Mod, Args} | Mods]) ->
+    case erlang:function_exported(Mod, handle, 2) of
+        true ->
+            case Mod:handle(Req, Args) of
+                ignore ->
+                    process(Req, Mods);
+                Response ->
+                    Response
+            end;
+        false ->
+            process(Req, Mods)
     end.
 
-forward_event(F, A, Mods) ->
-    lists:map(fun ({M, ExtraArgs}) ->
-                      M:handle_event(F, A, ExtraArgs)
-              end, Mods),
+preprocess(Req, []) ->
+    Req;
+preprocess(Req, [{Mod, Args} | Mods]) ->
+    case erlang:function_exported(Mod, preprocess, 2) of
+        true ->
+            preprocess(Mod:preprocess(Req, Args), Mods);
+        false ->
+            preprocess(Req, Mods)
+    end.
+
+postprocess(_Req, Res, []) ->
+    Res;
+postprocess(Req, Res, [{Mod, Args} | Mods]) ->
+    case erlang:function_exported(Mod, postprocess, 3) of
+        true ->
+            postprocess(Req, Mod:postprocess(Req, Res, Args), Mods);
+        false ->
+            postprocess(Req, Res, Mods)
+    end.
+
+
+forward_event(Event, Args, Mods) ->
+    lists:foreach(
+      fun ({M, ExtraArgs}) ->
+              case erlang:function_exported(M, handle_event, 3) of
+                  true ->
+                      M:handle_event(Event, Args, ExtraArgs);
+                  false ->
+                      ok
+              end
+      end, Mods),
     ok.
+
 
 %%
 %% INTERNAL HELPERS
