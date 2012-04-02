@@ -13,6 +13,7 @@ start_link(Server, ListenSocket, Callback) ->
 accept(Server, ListenSocket, Callback) ->
     case catch gen_tcp:accept(ListenSocket, 1000) of
         {ok, Socket} ->
+            t(accepted),
             gen_server:cast(Server, accepted),
             ?MODULE:handle_request(Socket, Callback),
             ok;
@@ -27,7 +28,6 @@ accept(Server, ListenSocket, Callback) ->
 %% socket. If nothing happens within the keep alive timeout, the
 %% connection is closed.
 handle_request(Socket, {Mod, Args} = Callback) ->
-    t(accept_start),
     {Method, RawPath, V, B0} = get_request(Socket, Callback),     t(request_start),
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
@@ -38,6 +38,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                headers = RequestHeaders, body = RequestBody,
                pid = self(), peer = get_peer(Socket, RequestHeaders)},
 
+    t(user_start),
     case execute_callback(Req, Callback) of
         {ResponseCode, UserHeaders, UserBody} ->
             t(user_end),
@@ -215,7 +216,10 @@ t(Key) ->
 
 get_timings() ->
     lists:flatmap(fun ({{time, Key}, Val}) ->
-                          erase({time, Key}),
+                          if
+                              Key =:= accepted -> ok;
+                              true -> erase({time, Key})
+                          end,
                           [{Key, Val}];
                      (_) ->
                           []
