@@ -32,7 +32,7 @@ and multiple request handlers.
 
 Feedback welcome!
 
-## Aren't there enough webservers in the Erlang community already?
+## Isn't there enough webservers in the Erlang community already?
 
 There are a few very mature and robust projects with steady
 development, one recently ceased development and one new kid on the
