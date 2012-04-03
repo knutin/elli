@@ -100,4 +100,7 @@ handle_event(elli_startup, [], Config) ->
 
 
 log(Msg, Config) ->
-    syslog:send(proplists:get_value(name, Config), Msg, [{ident, node()}]).
+    syslog:send(proplists:get_value(name, Config), Msg,
+                [{ident, node()},
+                 {facility, proplists:get_value(facility, Config, local0)}
+                ]).
