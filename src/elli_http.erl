@@ -387,7 +387,7 @@ get_peer(Socket, Headers) ->
 
 
 content_length(Body) ->
-    case size(Body) of
+    case iolist_size(Body) of
         0 -> [];
         N -> {<<"Content-Length">>, N}
     end.

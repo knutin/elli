@@ -27,6 +27,11 @@ handle('GET', [<<"hello">>], Req) ->
     Name = elli_request:get_arg(<<"name">>, Req),
     {ok, [], <<"Hello ", Name/binary>>};
 
+handle('GET', [<<"hello">>, <<"iolist">>], Req) ->
+    %% Fetch a get argument from the URL.
+    Name = elli_request:get_arg(<<"name">>, Req),
+    {ok, [], [<<"Hello ">>, Name]};
+
 handle('GET',[<<"headers.html">>], _Req) ->
     %% Set custom headers, for example 'Content-Type'
     {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
@@ -69,7 +74,7 @@ handle('GET', [<<"403">>], _Req) ->
     throw({403, [], <<"Forbidden">>});
 
 handle(_, _, _Req) ->
-    {404, [], <<"body">>}.
+    {404, [], <<"Not Found">>}.
 
 
 

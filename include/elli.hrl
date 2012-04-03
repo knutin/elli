@@ -8,7 +8,7 @@
 -type version() :: {1,0} | {1,1}.
 -type header() :: {Key::binary(), Value::binary() | string()}.
 -type headers() :: [header()].
--type body() :: binary().
+-type body() :: binary() | iolist().
 -type response() :: iolist().
 
 -type response_code() :: 200 | 404 | 500.

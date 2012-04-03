@@ -46,8 +46,8 @@ not_found() ->
     {ok, Response} = lhttpc:request("http://localhost:8080/foobarbaz", "GET", [], 1000),
     ?assertEqual({404, "Not Found"}, status(Response)),
     ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "4"}], headers(Response)),
-    ?assertEqual(<<"body">>, body(Response)).
+                  {"Content-Length", "9"}], headers(Response)),
+    ?assertEqual(<<"Not Found">>, body(Response)).
 
 crash() ->
     {ok, Response} = lhttpc:request("http://localhost:8080/crash", "GET", [], 1000),
