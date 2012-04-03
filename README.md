@@ -5,7 +5,7 @@ create a webserver that can be the building block for a massive
 throughput, low latency HTTP API. If robustness and performance is
 more important than a wide feature set, then `elli` might be for you.
 
-It is used in production at Wooga.
+Elli is used in production at Wooga.
 
 ## About
 
@@ -18,11 +18,12 @@ this.
 
 With this in mind we looked at the big names in the Erlang community:
 Yaws, Mochiweb, Misultin and Cowboy. We found Mochiweb to be the best
-match and we might eventually end up settling. However, we also wanted
-to see if we could take the architecture of Mochiweb and improve on
-it. `elli` takes the acceptor-turns-into-request-handler idea found in
-Mochiweb, the binaries-only idea from Cowboy and the request-response
-idea from WSGI/Rack (with chunked transfer being an exception).
+match and we might eventually end up settling for it. However, we also
+wanted to see if we could take the architecture of Mochiweb and
+improve on it. `elli` takes the acceptor-turns-into-request-handler
+idea found in Mochiweb, the binaries-only idea from Cowboy and the
+request-response idea from WSGI/Rack (with chunked transfer being an
+exception).
 
 On top of this we built a handler that allows us to write HTTP
 middleware modules to add practical features, like compression of
