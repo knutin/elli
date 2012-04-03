@@ -122,6 +122,7 @@ execute_callback(Req, {Mod, Args}) ->
 responsecode2bin(200) -> <<"HTTP/1.1 200 OK">>;
 responsecode2bin(204) -> <<"HTTP/1.1 204 No Content">>;
 responsecode2bin(304) -> <<"HTTP/1.1 304 Not Modified">>;
+responsecode2bin(307) -> <<"HTTP/1.1 307 Temporary Redirect">>;
 responsecode2bin(400) -> <<"HTTP/1.1 400 Bad Request">>;
 responsecode2bin(403) -> <<"HTTP/1.1 403 Forbidden">>;
 responsecode2bin(404) -> <<"HTTP/1.1 404 Not Found">>;
