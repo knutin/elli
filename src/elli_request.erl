@@ -2,7 +2,7 @@
 -include("elli.hrl").
 
 -export([send_chunk/2, chunk_ref/1, path/1, raw_path/1, get_header/2,
-         get_arg/2, get_arg/3, headers/1, peer/1, method/1, body/1,
+         get_arg/2, get_arg/3, body_qs/1, headers/1, peer/1, method/1, body/1,
          get_header/3]).
 
 %%
@@ -30,6 +30,13 @@ get_arg(_Key, #req{args = []}, Default) ->
     Default;
 get_arg(Key, #req{args = Args}, Default) ->
     proplists:get_value(Key, Args, Default).
+
+body_qs(#req{body = Body}) ->
+    try
+        elli_http:split_args(Body)
+    catch
+        _ -> []
+    end.
 
 %% @doc: Returns a reference that can be used to send chunks to the
 %% client. If the protocol does not support it, returns {error,

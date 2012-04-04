@@ -1,7 +1,7 @@
 -module(elli_http).
 -include("elli.hrl").
 
--export([start_link/3, accept/3, handle_request/2, chunk_loop/3]).
+-export([start_link/3, accept/3, handle_request/2, chunk_loop/3, split_args/1]).
 
 -spec start_link(pid(), port(), callback()) -> pid().
 start_link(Server, ListenSocket, Callback) ->
