@@ -31,12 +31,10 @@ get_arg(_Key, #req{args = []}, Default) ->
 get_arg(Key, #req{args = Args}, Default) ->
     proplists:get_value(Key, Args, Default).
 
+%% @doc Parses application/x-www-form-urlencoded body into a proplist
 body_qs(#req{body = Body}) ->
-    try
-        elli_http:split_args(Body)
-    catch
-        _ -> []
-    end.
+    elli_http:split_args(Body).
+
 
 %% @doc: Returns a reference that can be used to send chunks to the
 %% client. If the protocol does not support it, returns {error,
