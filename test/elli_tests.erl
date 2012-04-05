@@ -86,6 +86,11 @@ get_args() ->
     ?assertEqual(<<"Hello knut">>, body(Response)).
 
 
+body_qs_test() ->
+    Expected = [{<<"foo">>, <<"bar">>}, {<<"baz">>, <<"bang">>}],
+    Actual     = elli_request:body_qs(#req{body = <<"foo=bar&baz=bang">>}),
+    ?assertEqual(Expected, Actual).
+
 %% content_length() ->
 %%     S = s(),
 %%     {ok, Response} = lhttpc:request("http://localhost:8080/304",
