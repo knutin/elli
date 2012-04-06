@@ -57,7 +57,7 @@ handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
                         [elli_request:peer(Req),
                          TimeStr,
                          ResponseCode,
-                         byte_size(ResponseBody),
+                         iolist_size(ResponseBody),
                          elli_request:method(Req),
                          elli_request:raw_path(Req)
                         ]),
