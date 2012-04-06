@@ -109,11 +109,9 @@ execute_callback(Req, {Mod, Args}) ->
             {500, [], <<"Internal server error">>};
         error:Error ->
             Mod:handle_event(request_error, [Req, Error, erlang:get_stacktrace()], Args),
-            error_logger:info_msg("error: ~p~n", [Error]),
             {500, [], <<"Internal server error">>};
         exit:Exit ->
             Mod:handle_event(request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
-            error_logger:info_msg("exit: ~p~n", [Exit]),
             {500, [], <<"Internal server error">>}
     end.
 
