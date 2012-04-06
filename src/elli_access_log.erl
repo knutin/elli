@@ -65,15 +65,15 @@ handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
     log(Msg, Config),
     ok;
 
-handle_event(request_throw, [_Req, Exception, Stack], _Config) ->
-    error_logger:error_msg("exception: ~p~nstack: ~p~n", [Exception, Stack]),
+handle_event(request_throw, [Req, Exception, Stack], _Config) ->
+    error_logger:error_msg("exception: ~p~nstack: ~p~nrequest: ~p~n", [Exception, Stack, Req]),
     ok;
-handle_event(request_exit, [_Req, Exit, Stack], _Config) ->
-    error_logger:error_msg("exit: ~p~nstack: ~p~n", [Exit, Stack]),
+handle_event(request_exit, [Req, Exit, Stack], _Config) ->
+    error_logger:error_msg("exit: ~p~nstack: ~p~nrequest: ~p~n", [Exit, Stack, Req]),
     ok;
 
-handle_event(request_error, [_Req, Error, Stack], _Config) ->
-    error_logger:error_msg("error: ~p~nstack: ~p~n", [Error, Stack]),
+handle_event(request_error, [Req, Error, Stack], _Config) ->
+    error_logger:error_msg("error: ~p~nstack: ~p~nrequest: ~p~n", [Error, Stack, Req]),
     ok;
 
 handle_event(request_parse_error, [_Data], _Args) ->
