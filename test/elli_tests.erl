@@ -13,7 +13,8 @@ elli_test_() ->
       %% ?_test(no_compress()),
       ?_test(exception_flow()),
       ?_test(user_connection()),
-      ?_test(get_args())
+      ?_test(get_args()),
+      ?_test(shorthand())
 %%      ?_test(content_length())
      ]}.
 
@@ -84,6 +85,14 @@ get_args() ->
     {ok, Response} = lhttpc:request("http://localhost:8080/hello?name=knut",
                                     "GET", [], 1000),
     ?assertEqual(<<"Hello knut">>, body(Response)).
+
+shorthand() ->
+    {ok, Response} = lhttpc:request("http://localhost:8080/shorthand",
+                                    "GET", [], 1000),
+    ?assertEqual({200, "OK"}, status(Response)),
+    ?assertEqual([{"Connection", "Keep-Alive"},
+                  {"Content-Length", "5"}], headers(Response)),
+    ?assertEqual(<<"hello">>, body(Response)).
 
 
 

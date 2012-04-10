@@ -99,8 +99,10 @@ send_response(Socket, Code, Headers, Body, {Mod, Args}) ->
 execute_callback(Req, {Mod, Args}) ->
     try Mod:handle(Req, Args) of
         {ok, Headers, Body}       -> {200, Headers, Body};
+        {ok, Body}                -> {200, [], Body};
         {HttpCode, Headers, Body} -> {HttpCode, Headers, Body};
-        {chunk, Headers}          -> {chunk, Headers}
+        {chunk, Headers}          -> {chunk, Headers};
+        {HttpCode, Body}          -> {HttpCode, [], Body}
     catch
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             {ResponseCode, Headers, Body};

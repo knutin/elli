@@ -64,6 +64,9 @@ handle('GET', [<<"chunked">>], Req) ->
     spawn(fun() -> ?MODULE:chunk_loop(Ref) end),
     {chunk, []};
 
+handle('GET', [<<"shorthand">>], _Req) ->
+    {200, <<"hello">>};
+
 handle('GET', [<<"304">>], _Req) ->
     {304, [], <<>>};
 
