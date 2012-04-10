@@ -66,14 +66,17 @@ handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
     ok;
 
 handle_event(request_throw, [Req, Exception, Stack], _Config) ->
-    error_logger:error_msg("exception: ~p~nstack: ~p~nrequest: ~p~n", [Exception, Stack, Req]),
+    error_logger:error_msg("exception: ~p~nstack: ~p~nrequest: ~p~n",
+                           [Exception, Stack, elli_request:to_proplist(Req)]),
     ok;
 handle_event(request_exit, [Req, Exit, Stack], _Config) ->
-    error_logger:error_msg("exit: ~p~nstack: ~p~nrequest: ~p~n", [Exit, Stack, Req]),
+    error_logger:error_msg("exit: ~p~nstack: ~p~nrequest: ~p~n",
+                           [Exit, Stack, elli_request:to_proplist(Req)]),
     ok;
 
 handle_event(request_error, [Req, Error, Stack], _Config) ->
-    error_logger:error_msg("error: ~p~nstack: ~p~nrequest: ~p~n", [Error, Stack, Req]),
+    error_logger:error_msg("error: ~p~nstack: ~p~nrequest: ~p~n",
+                           [Error, Stack, elli_request:to_proplist(Req)]),
     ok;
 
 handle_event(request_parse_error, [_Data], _Args) ->
