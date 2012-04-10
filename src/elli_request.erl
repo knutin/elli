@@ -1,9 +1,21 @@
 -module(elli_request).
 -include("elli.hrl").
 
--export([send_chunk/2, chunk_ref/1, path/1, raw_path/1, get_header/2,
-         get_arg/2, get_arg/3, body_qs/1, headers/1, peer/1, method/1, body/1,
-         get_header/3]).
+-export([send_chunk/2
+         , chunk_ref/1
+         , path/1
+         , raw_path/1
+         , get_header/2
+         , get_arg/2
+         , get_arg/3
+         , body_qs/1
+         , headers/1
+         , peer/1
+         , method/1
+         , body/1
+         , get_header/3
+         , to_proplist/1
+        ]).
 
 %%
 %% Helpers for working with a #req{}
@@ -34,6 +46,11 @@ get_arg(Key, #req{args = Args}, Default) ->
 %% @doc Parses application/x-www-form-urlencoded body into a proplist
 body_qs(#req{body = Body}) ->
     elli_http:split_args(Body).
+
+
+to_proplist(#req{} = Req) ->
+    lists:zip(record_info(fields, req), tl(tuple_to_list(Req))).
+
 
 
 %% @doc: Returns a reference that can be used to send chunks to the

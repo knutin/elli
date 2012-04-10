@@ -86,10 +86,6 @@ get_args() ->
     ?assertEqual(<<"Hello knut">>, body(Response)).
 
 
-body_qs_test() ->
-    Expected = [{<<"foo">>, <<"bar">>}, {<<"baz">>, <<"bang">>}],
-    Actual     = elli_request:body_qs(#req{body = <<"foo=bar&baz=bang">>}),
-    ?assertEqual(Expected, Actual).
 
 %% content_length() ->
 %%     S = s(),
@@ -102,6 +98,34 @@ body_qs_test() ->
 %%     ?assertEqual(<<>>, body(Response)),
 
 %%     stop(S).
+
+
+body_qs_test() ->
+    ?assertEqual([{<<"foo">>, <<"bar">>}, {<<"baz">>, <<"bang">>}, {<<"found">>, true}],
+                 elli_request:body_qs(#req{body = <<"foo=bar&baz=bang&found">>})).
+
+to_proplist_test() ->
+    Req = #req{method = 'GET',
+               path = [<<"crash">>],
+               args = [],
+               version = {1,1},
+               raw_path = {abs_path,<<"/crash">>},
+               headers = [{<<"Host">>,<<"localhost:8080">>}],
+               body = <<>>,
+               pid = self(),
+               peer = <<"127.0.0.1">>},
+
+    Prop = [{method,'GET'},
+            {path,[<<"crash">>]},
+            {args,[]},
+            {raw_path,{abs_path,<<"/crash">>}},
+            {version,{1,1}},
+            {headers,[{<<"Host">>,<<"localhost:8080">>}]},
+            {body,<<>>},
+            {pid,self()},
+            {peer,<<"127.0.0.1">>}],
+    ?assertEqual(Prop, elli_request:to_proplist(Req)).
+
 
 %%
 %% HELPERS
