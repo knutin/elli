@@ -9,6 +9,7 @@
          , get_header/2
          , get_arg/2
          , get_arg/3
+         , get_args/1
          , body_qs/1
          , headers/1
          , peer/1
@@ -26,6 +27,14 @@
 %% @doc Returns the query string associated with the given Request as a binary.
 %%      #req.query_str is populated in elli_http:parse_path/1.
 query_str(#req{query_str = Qs}) -> Qs.
+
+
+-spec get_args(#req{}) -> QueryArgs :: proplists:proplist().
+%% @doc Returns a proplist of keys and values of the original query string.
+%%      Both keys and values in the returned proplists will be binaries or the
+%%      atom `true` in case no value was supplied for the query key.
+%%      #req.get_args also is populated in elli_http:parse_path/1.
+get_args(#req{args = Args}) -> Args.
 
 
 %% @doc: Returns path split into binary parts.
