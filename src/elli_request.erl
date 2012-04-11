@@ -5,6 +5,7 @@
          , chunk_ref/1
          , path/1
          , raw_path/1
+         , query_str/1
          , get_header/2
          , get_arg/2
          , get_arg/3
@@ -20,6 +21,12 @@
 %%
 %% Helpers for working with a #req{}
 %%
+
+-spec query_str(#req{}) -> QueryStr :: binary().
+%% @doc Returns the query string associated with the given Request as a binary.
+%%      #req.query_str is populated in elli_http:parse_path/1.
+query_str(#req{query_str = Qs}) -> Qs.
+
 
 %% @doc: Returns path split into binary parts.
 path(#req{path = Path})                     -> Path.
