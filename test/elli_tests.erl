@@ -136,6 +136,18 @@ to_proplist_test() ->
     ?assertEqual(Prop, elli_request:to_proplist(Req)).
 
 
+query_str_test_() ->
+    MakeReq = fun(Path) -> #req{raw_path = {abs_path, Path}} end,
+    [
+        % For empty query strings, expect `query_str` to return an empty binary.
+        ?_assertEqual(<<>>, elli_request:query_str(MakeReq(<<"/foo">>))),
+        ?_assertEqual(<<>>, elli_request:query_str(MakeReq(<<"/foo?">>))),
+        % Otherwise it should return everything to the right hand side of `?`.
+        ?_assertEqual(<<"bar=baz&baz=bang">>,
+                      elli_request:query_str(MakeReq(<<"/foo?bar=baz&baz=bang">>)))
+    ].
+
+
 %%
 %% HELPERS
 %%

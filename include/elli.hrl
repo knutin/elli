@@ -32,7 +32,6 @@
           path :: [binary()],
           args,
           raw_path :: binary(),
-          query_str :: binary(),
           version,
           headers :: headers(),
           body :: body(),

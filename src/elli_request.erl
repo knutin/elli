@@ -24,9 +24,13 @@
 %%
 
 -spec query_str(#req{}) -> QueryStr :: binary().
-%% @doc Returns the query string associated with the given Request as a binary.
-%%      #req.query_str is populated in elli_http:parse_path/1.
-query_str(#req{query_str = Qs}) -> Qs.
+%% @doc Calculates the query string associated with the given Request as a
+%%      binary.
+query_str(#req{raw_path = {abs_path, Path}}) ->
+    case binary:split(Path, [<<"?">>]) of
+        [_, Qs] -> Qs;
+        [_]     -> <<>>
+    end.
 
 
 -spec get_args(#req{}) -> QueryArgs :: proplists:proplist().
