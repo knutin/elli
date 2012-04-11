@@ -33,9 +33,9 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    {URL, URLArgs} = parse_path(RawPath),
+    {Path, URL, URLArgs} = parse_path(RawPath),
     Req = #req{method = Method, path = URL, args = URLArgs, version = V,
-               raw_path = RawPath,
+               raw_path = Path,
                headers = RequestHeaders, body = RequestBody,
                pid = self(), peer = get_peer(Socket, RequestHeaders)},
 
@@ -230,8 +230,8 @@ get_timings() ->
 
 parse_path({abs_path, FullPath}) ->
     case binary:split(FullPath, [<<"?">>]) of
-        [URL]       -> {split_path(URL), []};
-        [URL, Args] -> {split_path(URL), split_args(Args)}
+        [URL]       -> {FullPath, split_path(URL), []};
+        [URL, Args] -> {FullPath, split_path(URL), split_args(Args)}
     end.
 
 split_path(<<"/", Path/binary>>) ->

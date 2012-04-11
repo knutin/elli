@@ -26,7 +26,7 @@
 -spec query_str(#req{}) -> QueryStr :: binary().
 %% @doc Calculates the query string associated with the given Request as a
 %%      binary.
-query_str(#req{raw_path = {abs_path, Path}}) ->
+query_str(#req{raw_path = Path}) ->
     case binary:split(Path, [<<"?">>]) of
         [_, Qs] -> Qs;
         [_]     -> <<>>
@@ -43,7 +43,7 @@ get_args(#req{args = Args}) -> Args.
 
 %% @doc: Returns path split into binary parts.
 path(#req{path = Path})                     -> Path.
-raw_path(#req{raw_path = {abs_path, Path}}) -> Path.
+raw_path(#req{raw_path = Path})             -> Path.
 headers(#req{headers = Headers})            -> Headers.
 peer(#req{peer = Peer})                     -> Peer.
 method(#req{method = Method})               -> Method.

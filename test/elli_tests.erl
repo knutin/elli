@@ -118,7 +118,7 @@ to_proplist_test() ->
                path = [<<"crash">>],
                args = [],
                version = {1,1},
-               raw_path = {abs_path,<<"/crash">>},
+               raw_path = <<"/crash">>,
                headers = [{<<"Host">>,<<"localhost:8080">>}],
                body = <<>>,
                pid = self(),
@@ -127,7 +127,7 @@ to_proplist_test() ->
     Prop = [{method,'GET'},
             {path,[<<"crash">>]},
             {args,[]},
-            {raw_path,{abs_path,<<"/crash">>}},
+            {raw_path,<<"/crash">>},
             {version,{1,1}},
             {headers,[{<<"Host">>,<<"localhost:8080">>}]},
             {body,<<>>},
@@ -137,7 +137,7 @@ to_proplist_test() ->
 
 
 query_str_test_() ->
-    MakeReq = fun(Path) -> #req{raw_path = {abs_path, Path}} end,
+    MakeReq = fun(Path) -> #req{raw_path = Path} end,
     [
         % For empty query strings, expect `query_str` to return an empty binary.
         ?_assertEqual(<<>>, elli_request:query_str(MakeReq(<<"/foo">>))),
