@@ -32,9 +32,9 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    {URL, URLArgs} = parse_path(RawPath),
+    {URL, QueryStr, URLArgs} = parse_path(RawPath),
     Req = #req{method = Method, path = URL, args = URLArgs, version = V,
-               raw_path = RawPath,
+               raw_path = RawPath, query_str = QueryStr,
                headers = RequestHeaders, body = RequestBody,
                pid = self(), peer = get_peer(Socket, RequestHeaders)},
 
@@ -229,8 +229,8 @@ get_timings() ->
 
 parse_path({abs_path, FullPath}) ->
     case binary:split(FullPath, [<<"?">>]) of
-        [URL]       -> {split_path(URL), []};
-        [URL, Args] -> {split_path(URL), split_args(Args)}
+        [URL]       -> {split_path(URL), <<>>, []};
+        [URL, Args] -> {split_path(URL), Args, split_args(Args)}
     end.
 
 split_path(<<"/", Path/binary>>) ->
@@ -392,3 +392,26 @@ content_length(Body) ->
         0 -> [];
         N -> {<<"Content-Length">>, N}
     end.
+
+
+%%
+%% TEST FUNCTIONS
+%%
+
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(EUNIT).
+
+query_str_test_() ->
+    {_, Qs, _} = ParsedPath = parse_path({abs_path, <<"/foo?bar=baz&baz=bang">>}),
+    [
+        % For non present paths, expect `parse_path` to return an empty binary.
+        ?_assertMatch({_, <<>>, _}, parse_path({abs_path, <<"/foo">>})),
+        ?_assertMatch({_, <<>>, _}, parse_path({abs_path, <<"/foo?">>})),
+        % Otherwise it should return everything to the right hand side of `?`.
+        ?_assertMatch({_, <<"bar=baz&baz=bang">>, _}, ParsedPath),
+        % Assert that the public accessor returns the parsed query string as well.
+        ?_assertMatch(<<"bar=baz&baz=bang">>,
+                      elli_request:query_str(#req{query_str = Qs}))
+    ].
+
+-endif.
