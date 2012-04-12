@@ -23,23 +23,6 @@
 %% Helpers for working with a #req{}
 %%
 
--spec query_str(#req{}) -> QueryStr :: binary().
-%% @doc Calculates the query string associated with the given Request as a
-%%      binary.
-query_str(#req{raw_path = Path}) ->
-    case binary:split(Path, [<<"?">>]) of
-        [_, Qs] -> Qs;
-        [_]     -> <<>>
-    end.
-
-
--spec get_args(#req{}) -> QueryArgs :: proplists:proplist().
-%% @doc Returns a proplist of keys and values of the original query string.
-%%      Both keys and values in the returned proplists will be binaries or the
-%%      atom `true` in case no value was supplied for the query key.
-%%      #req.get_args also is populated in elli_http:parse_path/1.
-get_args(#req{args = Args}) -> Args.
-
 
 %% @doc: Returns path split into binary parts.
 path(#req{path = Path})                     -> Path.
@@ -68,6 +51,25 @@ body_qs(#req{body = Body}) ->
     elli_http:split_args(Body).
 
 
+-spec get_args(#req{}) -> QueryArgs :: proplists:proplist().
+%% @doc Returns a proplist of keys and values of the original query
+%%      string.  Both keys and values in the returned proplists will
+%%      be binaries or the atom `true` in case no value was supplied
+%%      for the query key.
+get_args(#req{args = Args}) -> Args.
+
+-spec query_str(#req{}) -> QueryStr :: binary().
+%% @doc Calculates the query string associated with the given Request
+%% as a binary.
+query_str(#req{raw_path = Path}) ->
+    case binary:split(Path, [<<"?">>]) of
+        [_, Qs] -> Qs;
+        [_]     -> <<>>
+    end.
+
+
+%% @doc: Serializes the request record to a proplist. Useful for
+%% logging
 to_proplist(#req{} = Req) ->
     lists:zip(record_info(fields, req), tl(tuple_to_list(Req))).
 

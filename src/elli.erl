@@ -18,6 +18,7 @@ start_link() -> start_link([{callback, elli_example_callback},
                             {callback_args, []}]).
 
 start_link(Opts) ->
+    %% TODO: Validate opts
     gen_server:start_link(?MODULE, [Opts], []).
 
 get_acceptors(S) ->
