@@ -2,6 +2,7 @@
 -include("elli.hrl").
 
 -export([send_chunk/2
+         , async_send_chunk/2
          , chunk_ref/1
          , path/1
          , raw_path/1
@@ -83,6 +84,8 @@ chunk_ref(#req{version = {1, 1}} = Req) ->
 chunk_ref(_) ->
     {error, not_supported}.
 
+async_send_chunk(Ref, Data) ->
+    Ref ! {chunk, Data}.
 
 send_chunk(Ref, Data) ->
     send_chunk(Ref, Data, 5000).

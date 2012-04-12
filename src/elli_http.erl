@@ -135,6 +135,10 @@ chunk_loop(Socket, Req, open) ->
             io:format("client closed socket~n"),
             ?MODULE:chunk_loop(Socket, Req, closed);
 
+        {chunk, <<>>} ->
+            gen_tcp:send(Socket, <<"0\r\n\r\n">>),
+            gen_tcp:close(Socket),
+            ok;
         {chunk, <<>>, From} ->
             case gen_tcp:send(Socket, <<"0\r\n\r\n">>) of
                 ok ->
@@ -146,6 +150,11 @@ chunk_loop(Socket, Req, open) ->
                     ok
             end;
 
+        {chunk, Data} ->
+            Size = integer_to_list(iolist_size(Data), 16),
+            Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
+            gen_tcp:send(Socket, Response),
+            ?MODULE:chunk_loop(Socket, Req, open);
         {chunk, Data, From} ->
             Size = integer_to_list(iolist_size(Data), 16),
             Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
