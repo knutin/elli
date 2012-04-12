@@ -84,7 +84,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
 
 %% @doc: Generates a HTTP response and sends it to the client
 send_response(Socket, Code, Headers, Body, {Mod, Args}) ->
-    Response = [responsecode2bin(Code), <<"\r\n">>,
+    Response = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                 encode_headers(Headers), <<"\r\n">>,
                 Body],
 
@@ -117,18 +117,6 @@ execute_callback(Req, {Mod, Args}) ->
             Mod:handle_event(request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
             {500, [], <<"Internal server error">>}
     end.
-
-
-
-responsecode2bin(200) -> <<"HTTP/1.1 200 OK">>;
-responsecode2bin(204) -> <<"HTTP/1.1 204 No Content">>;
-responsecode2bin(304) -> <<"HTTP/1.1 304 Not Modified">>;
-responsecode2bin(307) -> <<"HTTP/1.1 307 Temporary Redirect">>;
-responsecode2bin(400) -> <<"HTTP/1.1 400 Bad Request">>;
-responsecode2bin(403) -> <<"HTTP/1.1 403 Forbidden">>;
-responsecode2bin(404) -> <<"HTTP/1.1 404 Not Found">>;
-responsecode2bin(500) -> <<"HTTP/1.1 500 Internal Server Error">>.
-
 
 
 %% @doc: The chunk loop is an intermediary between the socket and the
@@ -393,3 +381,60 @@ content_length(Body) ->
         0 -> [];
         N -> {<<"Content-Length">>, N}
     end.
+
+
+%% @doc: Response code string. Lifted from cowboy_http_req.erl
+status(100) -> <<"100 Continue">>;
+status(101) -> <<"101 Switching Protocols">>;
+status(102) -> <<"102 Processing">>;
+status(200) -> <<"200 OK">>;
+status(201) -> <<"201 Created">>;
+status(202) -> <<"202 Accepted">>;
+status(203) -> <<"203 Non-Authoritative Information">>;
+status(204) -> <<"204 No Content">>;
+status(205) -> <<"205 Reset Content">>;
+status(206) -> <<"206 Partial Content">>;
+status(207) -> <<"207 Multi-Status">>;
+status(226) -> <<"226 IM Used">>;
+status(300) -> <<"300 Multiple Choices">>;
+status(301) -> <<"301 Moved Permanently">>;
+status(302) -> <<"302 Found">>;
+status(303) -> <<"303 See Other">>;
+status(304) -> <<"304 Not Modified">>;
+status(305) -> <<"305 Use Proxy">>;
+status(306) -> <<"306 Switch Proxy">>;
+status(307) -> <<"307 Temporary Redirect">>;
+status(400) -> <<"400 Bad Request">>;
+status(401) -> <<"401 Unauthorized">>;
+status(402) -> <<"402 Payment Required">>;
+status(403) -> <<"403 Forbidden">>;
+status(404) -> <<"404 Not Found">>;
+status(405) -> <<"405 Method Not Allowed">>;
+status(406) -> <<"406 Not Acceptable">>;
+status(407) -> <<"407 Proxy Authentication Required">>;
+status(408) -> <<"408 Request Timeout">>;
+status(409) -> <<"409 Conflict">>;
+status(410) -> <<"410 Gone">>;
+status(411) -> <<"411 Length Required">>;
+status(412) -> <<"412 Precondition Failed">>;
+status(413) -> <<"413 Request Entity Too Large">>;
+status(414) -> <<"414 Request-URI Too Long">>;
+status(415) -> <<"415 Unsupported Media Type">>;
+status(416) -> <<"416 Requested Range Not Satisfiable">>;
+status(417) -> <<"417 Expectation Failed">>;
+status(418) -> <<"418 I'm a teapot">>;
+status(422) -> <<"422 Unprocessable Entity">>;
+status(423) -> <<"423 Locked">>;
+status(424) -> <<"424 Failed Dependency">>;
+status(425) -> <<"425 Unordered Collection">>;
+status(426) -> <<"426 Upgrade Required">>;
+status(500) -> <<"500 Internal Server Error">>;
+status(501) -> <<"501 Not Implemented">>;
+status(502) -> <<"502 Bad Gateway">>;
+status(503) -> <<"503 Service Unavailable">>;
+status(504) -> <<"504 Gateway Timeout">>;
+status(505) -> <<"505 HTTP Version Not Supported">>;
+status(506) -> <<"506 Variant Also Negotiates">>;
+status(507) -> <<"507 Insufficient Storage">>;
+status(510) -> <<"510 Not Extended">>;
+status(B) when is_binary(B) -> B.
