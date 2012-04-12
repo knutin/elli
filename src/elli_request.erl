@@ -85,10 +85,15 @@ chunk_ref(_) ->
 
 
 send_chunk(Ref, Data) ->
+    send_chunk(Ref, Data, 5000).
+
+send_chunk(Ref, Data, Timeout) ->
     Ref ! {chunk, Data, self()},
     receive
         {Ref, ok} ->
             ok;
         {Ref, {error, Reason}} ->
             {error, Reason}
+    after Timeout ->
+            {error, timeout}
     end.
