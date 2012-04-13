@@ -385,11 +385,9 @@ get_peer(Socket, Headers) ->
     end.
 
 
-content_length(Body) ->
-    case iolist_size(Body) of
-        0 -> [];
-        N -> {<<"Content-Length">>, N}
-    end.
+content_length(Body)->
+    {<<"Content-Length">>, iolist_size(Body)}.
+
 
 
 %% @doc: Response code string. Lifted from cowboy_http_req.erl

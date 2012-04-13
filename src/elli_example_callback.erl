@@ -70,6 +70,9 @@ handle('GET', [<<"shorthand">>], _Req) ->
 handle('GET', [<<"304">>], _Req) ->
     {304, [], <<>>};
 
+handle('GET', [<<"302">>], _Req) ->
+    {302, [{<<"Location">>, <<"/hello/world">>}], <<>>};
+
 handle('GET', [<<"403">>], _Req) ->
     %% Exceptions formatted as return codes can be used to
     %% short-circuit a response, for example in case of
