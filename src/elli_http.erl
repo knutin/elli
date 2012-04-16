@@ -41,7 +41,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
 
     t(user_start),
     case execute_callback(Req, Callback) of
-        {ResponseCode, UserHeaders, UserBody} ->
+        {response, ResponseCode, UserHeaders, UserBody} ->
             t(user_end),
 
             ResponseHeaders = [
@@ -64,13 +64,14 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                     ok
             end;
 
-        {chunk, UserHeaders} ->
+        {chunk, UserHeaders, Initial} ->
             t(user_end),
 
             ResponseHeaders = [{<<"Transfer-Encoding">>, <<"chunked">>},
                                connection(Req, UserHeaders)
                                | UserHeaders],
-            send_response(Socket, 200, ResponseHeaders, <<>>, Callback),
+            send_response(Socket, 200, ResponseHeaders, <<"">>, Callback),
+            Initial =:= <<"">> orelse send_chunk(Socket, Initial),
 
             chunk_loop(Socket, Req),
 
@@ -99,11 +100,12 @@ send_response(Socket, Code, Headers, Body, {Mod, Args}) ->
 %% response.
 execute_callback(Req, {Mod, Args}) ->
     try Mod:handle(Req, Args) of
-        {ok, Headers, Body}       -> {200, Headers, Body};
-        {ok, Body}                -> {200, [], Body};
-        {HttpCode, Headers, Body} -> {HttpCode, Headers, Body};
-        {chunk, Headers}          -> {chunk, Headers};
-        {HttpCode, Body}          -> {HttpCode, [], Body}
+        {ok, Headers, Body}       -> {response, 200, Headers, Body};
+        {ok, Body}                -> {response, 200, [], Body};
+        {chunk, Headers}          -> {chunk, Headers, <<"">>};
+        {chunk, Headers, Initial} -> {chunk, Headers, Initial};
+        {HttpCode, Headers, Body} -> {response, HttpCode, Headers, Body};
+        {HttpCode, Body}          -> {response, HttpCode, [], Body}
     catch
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             {ResponseCode, Headers, Body};
@@ -151,14 +153,10 @@ chunk_loop(Socket, Req, open) ->
             end;
 
         {chunk, Data} ->
-            Size = integer_to_list(iolist_size(Data), 16),
-            Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
-            gen_tcp:send(Socket, Response),
+            send_chunk(Socket, Data),
             ?MODULE:chunk_loop(Socket, Req, open);
         {chunk, Data, From} ->
-            Size = integer_to_list(iolist_size(Data), 16),
-            Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
-            case gen_tcp:send(Socket, Response) of
+            case send_chunk(Socket, Data) of
                 ok ->
                     From ! {self(), ok};
                 {error, closed} ->
@@ -176,6 +174,12 @@ chunk_loop(Socket, Req, closed) ->
     after 1000 ->
             ?MODULE:chunk_loop(Socket, Req, closed)
     end.
+
+
+send_chunk(Socket, Data) ->
+    Size = integer_to_list(iolist_size(Data), 16),
+    Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
+    gen_tcp:send(Socket, Response).
 
 
 
