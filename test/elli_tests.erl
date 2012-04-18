@@ -154,6 +154,12 @@ register_test() ->
     ?assertEqual(Pid, whereis(elli)),
     ok.
 
+invalid_callback_test() ->
+    case catch elli:start_link([{callback, elli}]) of
+        E ->
+            ?assertEqual(invalid_callback, E)
+    end.
+
 
 %%
 %% HELPERS

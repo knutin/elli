@@ -18,7 +18,10 @@ start_link() -> start_link([{callback, elli_example_callback},
                             {callback_args, []}]).
 
 start_link(Opts) ->
-    %% TODO: Validate opts
+    %% Validate options
+    Callback = required_opt(callback, Opts),
+    valid_callback(Callback) orelse throw(invalid_callback),
+
     case proplists:get_value(name, Opts) of
         undefined ->
             gen_server:start_link(?MODULE, [Opts], []);
@@ -42,10 +45,14 @@ stop(S) ->
 
 init([Opts]) ->
     process_flag(trap_exit, true),
-    Callback = proplists:get_value(callback, Opts), %% TODO: Check if handle/1 is exported
+    Callback = required_opt(callback, Opts),
     CallbackArgs = proplists:get_value(callback_args, Opts),
     Port = proplists:get_value(port, Opts, 8080),
+    MinAcceptors = proplists:get_value(min_acceptors, Opts, 20),
 
+    %% Notify the handler that we are about to start accepting
+    %% requests, so it can create necessary supporting processes, ETS
+    %% tables, etc.
     ok = Callback:handle_event(elli_startup, [], CallbackArgs),
 
     {ok, Socket} = gen_tcp:listen(Port, [binary,
@@ -54,7 +61,8 @@ init([Opts]) ->
                                          {packet, raw},
                                          {active, false}
                                         ]),
-    Acceptors = [start_acceptor(Socket, {Callback, CallbackArgs}) || _ <- lists:seq(1, 20)],
+    Acceptors = [start_acceptor(Socket, {Callback, CallbackArgs})
+                 || _ <- lists:seq(1, MinAcceptors)],
 
     {ok, #state{socket = Socket,
                 acceptors = Acceptors,
@@ -72,7 +80,6 @@ handle_call(stop, _From, State) ->
 
 handle_cast(accepted, State) ->
     Pid = start_acceptor(State#state.socket, State#state.callback),
-
     {noreply, State#state{acceptors = [Pid | State#state.acceptors],
                           open_reqs = State#state.open_reqs + 1}};
 
@@ -101,3 +108,16 @@ code_change(_OldVsn, State, _Extra) ->
 start_acceptor(Socket, Callback) ->
     elli_http:start_link(self(), Socket, Callback).
 
+
+required_opt(Name, Opts) ->
+    case proplists:get_value(Name, Opts) of
+        undefined ->
+            throw(badarg);
+        Value ->
+            Value
+    end.
+
+
+valid_callback(Mod) ->
+    lists:member({handle, 2}, Mod:module_info(exports)) andalso
+        lists:member({handle_event, 3}, Mod:module_info(exports)).
