@@ -19,7 +19,12 @@ start_link() -> start_link([{callback, elli_example_callback},
 
 start_link(Opts) ->
     %% TODO: Validate opts
-    gen_server:start_link(?MODULE, [Opts], []).
+    case proplists:get_value(name, Opts) of
+        undefined ->
+            gen_server:start_link(?MODULE, [Opts], []);
+        Name ->
+            gen_server:start_link(Name, ?MODULE, [Opts], [])
+    end.
 
 get_acceptors(S) ->
     gen_server:call(S, get_acceptors).

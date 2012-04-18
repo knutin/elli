@@ -148,6 +148,13 @@ query_str_test_() ->
     ].
 
 
+register_test() ->
+    ?assertEqual(undefined, whereis(elli)),
+    {ok, Pid} = elli:start_link([{name, {local, elli}}, {callback, elli_example_callback}]),
+    ?assertEqual(Pid, whereis(elli)),
+    ok.
+
+
 %%
 %% HELPERS
 %%
