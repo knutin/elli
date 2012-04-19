@@ -163,7 +163,7 @@ chunk_loop(Socket, Req, open) ->
                     From ! {self(), {error, closed}}
             end,
             ?MODULE:chunk_loop(Socket, Req, open)
-    after 1000 ->
+    after 10000 ->
             ?MODULE:chunk_loop(Socket, Req, open)
     end;
 
@@ -171,7 +171,7 @@ chunk_loop(Socket, Req, closed) ->
     receive
         {chunk, _, From} ->
             From ! {self(), {error, closed}}
-    after 1000 ->
+    after 10000 ->
             ?MODULE:chunk_loop(Socket, Req, closed)
     end.
 
