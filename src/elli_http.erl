@@ -134,7 +134,6 @@ chunk_loop(Socket, Req) ->
 chunk_loop(Socket, Req, open) ->
     receive
         {tcp_closed, Socket} ->
-            io:format("client closed socket~n"),
             ?MODULE:chunk_loop(Socket, Req, closed);
 
         {chunk, <<>>} ->
