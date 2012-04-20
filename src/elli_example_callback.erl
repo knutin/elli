@@ -25,6 +25,7 @@ handle('GET',[<<"hello">>, <<"world">>], _Req) ->
 handle('GET', [<<"hello">>], Req) ->
     %% Fetch a get argument from the URL.
     Name = elli_request:get_arg(<<"name">>, Req),
+    timer:sleep(10),
     {ok, [], <<"Hello ", Name/binary>>};
 
 handle('GET', [<<"hello">>, <<"iolist">>], Req) ->
@@ -49,7 +50,7 @@ handle('GET', [<<"crash">>], _Req) ->
 
 handle('GET', [<<"compressed">>], _Req) ->
     %% Body with a byte size over 1024 are automatically gzipped
-    {ok, [], binary:copy(<<"Hello World!">>, 86)};
+    {ok, binary:copy(<<"Hello World!">>, 86)};
 
 handle('GET', [<<"chunked">>], Req) ->
     %% Start a chunked response for streaming real-time events to the

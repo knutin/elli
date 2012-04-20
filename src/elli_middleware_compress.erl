@@ -1,6 +1,8 @@
 -module(elli_middleware_compress).
 -export([postprocess/3]).
 
+postprocess(Req, {ResponseCode, Body}, Config) ->
+    postprocess(Req, {ResponseCode, [], Body}, Config);
 
 postprocess(Req, {ResponseCode, Headers, Body} = Res, Config) ->
     Threshold = proplists:get_value(compress_byte_size, Config, 1024),
