@@ -1,10 +1,12 @@
 -module(elli_middleware_compress).
 -export([postprocess/3]).
 
-postprocess(Req, {ResponseCode, Body}, Config) ->
+postprocess(Req, {ResponseCode, Body}, Config)
+  when is_integer(ResponseCode) orelse ResponseCode =:= ok ->
     postprocess(Req, {ResponseCode, [], Body}, Config);
 
-postprocess(Req, {ResponseCode, Headers, Body} = Res, Config) ->
+postprocess(Req, {ResponseCode, Headers, Body} = Res, Config)
+  when is_integer(ResponseCode) orelse ResponseCode =:= ok ->
     Threshold = proplists:get_value(compress_byte_size, Config, 1024),
     case should_compress(Body, Threshold) of
         false ->
@@ -17,7 +19,10 @@ postprocess(Req, {ResponseCode, Headers, Body} = Res, Config) ->
                     NewHeaders = [{<<"Content-Encoding">>, Encoding} | Headers],
                     {ResponseCode, NewHeaders, CompressedBody}
             end
-    end.
+    end;
+postprocess(_, Res, _) ->
+    Res.
+
 
 
 
