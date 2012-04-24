@@ -1,15 +1,14 @@
 # elli - Erlang web server for HTTP APIs
 
-This project is experimenting with a different core architecture to
-create a webserver that can be the building block for a massive
-throughput, low latency HTTP API. If robustness and performance is
-more important than a wide feature set, then `elli` might be for you.
+Elli is a webserver aimed exclusively at building high-throughput,
+low-latency HTTP APIs. If robustness and performance is more important
+than a wide feature set, then `elli` might be for you.
 
 Elli is used in production at Wooga.
 
 ## About
 
-From operating and debugging a high-volume, low-latency app we have
+From operating and debugging high-volume, low-latency apps we have
 gained some valuable insight into what we want from a webserver. We
 want simplicity, robustness, performance, ease of debugging,
 visibility into strange client behaviour, really good instrumentation
@@ -27,8 +26,8 @@ exception).
 
 On top of this we built a handler that allows us to write HTTP
 middleware modules to add practical features, like compression of
-responses, log access and errors with timings, statistics dashboard
-and multiple request handlers.
+responses, access with timings, statistics dashboard and multiple
+request handlers.
 
 Feedback welcome!
 

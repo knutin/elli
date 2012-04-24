@@ -1,3 +1,8 @@
+%% @doc: Elli HTTP request implementation
+%%
+%% An elli_http process blocks in gen_tcp:accept/2 until a client
+%% connects. It then handles requests on that connection until it's
+%% closed either by the client timing out or explicitly by the user.
 -module(elli_http).
 -include("elli.hrl").
 

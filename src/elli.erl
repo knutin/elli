@@ -1,3 +1,8 @@
+%% @doc: Elli manager
+%%
+%% This is a gen_server that manages the processes accepting
+%% connections on the socket.
+
 -module(elli).
 -behaviour(gen_server).
 -include("elli.hrl").
