@@ -35,7 +35,10 @@ get_acceptors(S) ->
     gen_server:call(S, get_acceptors).
 
 get_open_reqs(S) ->
-    gen_server:call(S, get_open_reqs).
+    get_open_reqs(S, 5000).
+
+get_open_reqs(S, Timeout) ->
+    gen_server:call(S, get_open_reqs, Timeout).
 
 stop(S) ->
     gen_server:call(S, stop).
