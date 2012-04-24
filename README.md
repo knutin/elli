@@ -4,7 +4,10 @@ Elli is a webserver aimed exclusively at building high-throughput,
 low-latency HTTP APIs. If robustness and performance is more important
 than a wide feature set, then `elli` might be for you.
 
-Elli is used in production at Wooga.
+Even though it is very early and Elli still has many rough edges, it
+is used in production at Wooga.
+
+Feedback and pull requests welcome!
 
 ## About
 
@@ -29,8 +32,6 @@ middleware modules to add practical features, like compression of
 responses, access with timings, statistics dashboard and multiple
 request handlers.
 
-Feedback welcome!
-
 ## Isn't there enough webservers in the Erlang community already?
 
 There are a few very mature and robust projects with steady
@@ -39,6 +40,13 @@ block with lots of interest. As `elli` is not a general purpose
 webserver, but more of a specialized tool, we believe it has a very
 different target audience and would not attract effort or users away
 from the big names.
+
+## Performance
+
+"Hello World!" micro-benchmarks are really useful when measuring the
+performance, but the numbers usually do more harm than good when
+released. For this reason I include an ApacheBench script
+(`bin/ab.sh`) and encourage you to run the benchmarks on your own.
 
 
 ## Usage
@@ -56,3 +64,17 @@ from the big names.
 ## Callback module
 
 see `src/elli_example_callback.erl`
+
+
+## Roadmap
+
+ * Add proper `Date` header as clients use this for computing cache expirations
+ * "Media" middleware for serving up static files from disk under a certain path
+ * Sendfile
+
+
+## Extensions
+
+ * Access log: https://github.com/knutin/elli/blob/master/src/elli_access_log.erl
+ * Real-time statistics dashboard: https://github.com/knutin/elli_stats
+ * Basic auth: https://github.com/martinrehfeld/elli_basicauth

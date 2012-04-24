@@ -8,7 +8,13 @@
 -include("elli.hrl").
 
 %% API
--export([start_link/0, start_link/1, stop/1, get_acceptors/1, get_open_reqs/1]).
+-export([start_link/0
+         , start_link/1
+         , stop/1
+         , get_acceptors/1
+         , get_open_reqs/1
+         , get_open_reqs/2
+        ]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
