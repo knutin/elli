@@ -25,7 +25,6 @@ handle('GET',[<<"hello">>, <<"world">>], _Req) ->
 handle('GET', [<<"hello">>], Req) ->
     %% Fetch a get argument from the URL.
     Name = elli_request:get_arg(<<"name">>, Req),
-    timer:sleep(10),
     {ok, [], <<"Hello ", Name/binary>>};
 
 handle('GET', [<<"hello">>, <<"iolist">>], Req) ->
@@ -63,7 +62,7 @@ handle('GET', [<<"chunked">>], Req) ->
     %% Return immediately {chunk, Headers} to signal we want to chunk.
     Ref = elli_request:chunk_ref(Req),
     spawn(fun() -> ?MODULE:chunk_loop(Ref) end),
-    {chunk, []};
+    {chunk, [{<<"Content-Type">>, <<"text/event-stream">>}]};
 
 handle('GET', [<<"shorthand">>], _Req) ->
     {200, <<"hello">>};
