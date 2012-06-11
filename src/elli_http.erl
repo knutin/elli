@@ -339,7 +339,8 @@ encode_headers([{K, V} | H]) ->
 
 
 encode_value(V) when is_integer(V) -> ?i2l(V);
-encode_value(V) when is_binary(V)  -> V.
+encode_value(V) when is_binary(V)  -> V;
+encode_value(V) when is_list(V) -> list_to_binary(V).
 
 
 connection_token(#req{version = {1, 1}, headers = Headers}) ->
