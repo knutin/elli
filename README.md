@@ -32,7 +32,7 @@ middleware modules to add practical features, like compression of
 responses, access with timings, statistics dashboard and multiple
 request handlers.
 
-## Isn't there enough webservers in the Erlang community already?
+## Aren't there enough webservers in the Erlang community already?
 
 There are a few very mature and robust projects with steady
 development, one recently ceased development and one new kid on the
@@ -48,22 +48,99 @@ performance, but the numbers usually do more harm than good when
 released. For this reason I include an ApacheBench script
 (`bin/ab.sh`) and encourage you to run the benchmarks on your own.
 
+## Installation
+
+Add elli to you application by adding it as a dependency to you rebar
+config.
+
+```erlang
+% rebar.config:
+{deps, [
+    {elli, "", {git, "git://github.com/knutin/elli.git"}},
+    % ...
+]}.
+```
+
+Afterwards you can run:
+
+```
+$: ./rebar get-deps
+$: ./rebar compile
+```
+
 
 ## Usage
+```
+$: erl -pa ebin
 
-    $: ./rebar get-deps
-    $: ./rebar compile
-    $: erl -pa ebin
+% starting elli
+1>: {ok, Pid} = elli:start_link([{callback, elli_example_callback}, {port, 3000}]).
 
-    % starting elli
-    1>: {ok, Pid} = elli:start_link([{callback, elli_example_callback}, {port, 3000}]).
-
-    % stopping elli
-    2>: elli:stop(Pid).
+% stopping elli
+2>: elli:stop(Pid).
+```
 
 ## Callback module
 
-see `src/elli_example_callback.erl`
+There is an [example callback module](https://github.com/knutin/elli/blob/master/src/elli_example_callback.erl)
+distributed with elli.
+
+A minimal callback module would look like this:
+
+```erlang
+-module(elli_minimal_callback).
+-export([handle/2, handle_event/3]).
+
+-include("elli.hrl").
+-behaviour(elli_handler).
+
+handle(Req, _Args) ->
+    %% Delegate to our handler function
+    handle(Req#req.method, elli_request:path(Req), Req).
+
+handle('GET',[<<"hello">>, <<"world">>], _Req) ->
+    %% Reply with a normal response. 'ok' can be used instead of '200'
+    %% to signal success.
+    {ok, [], <<"Hello World!">>};
+
+handle(_, _, _Req) ->
+    {404, [], <<"Not Found">>}.
+
+%% @doc: Handle request events, like request completed, exception
+%% thrown, client timeout, etc. Must return 'ok'.
+handle_event(_Event, _Data, _Args) ->
+    ok.
+
+```
+
+## Supervisor Childspec example
+
+To add elli to a supervisor you can use the following example and adapt it to
+your needs.
+
+
+```erlang
+-module(fancyapi_sup).
+-behaviour(supervisor).
+-export([start_link/0]).
+-export([init/1]).
+
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+init([]) ->
+    ElliOpts = [{callback, fancyapi_callback}, {port, 3000}],
+    ElliSpec = {
+        fancy_http,
+        {elli, start_link, [ElliOpts]},
+        permanent,
+        5000,
+        worker,
+        [elli]},
+
+    {ok, { {one_for_one, 5, 10}, [ElliSpec]} }.
+
+```
 
 
 ## Roadmap
