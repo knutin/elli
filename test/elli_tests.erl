@@ -24,7 +24,7 @@ setup() ->
     application:start(crypto),
     application:start(public_key),
     application:start(ssl),
-    lhttpc:start(),
+    inets:start(),
     {ok, P} = elli:start_link([{callback, elli_example_callback}]),
     unlink(P),
     register(elli, P),
@@ -35,27 +35,27 @@ teardown(Pids) ->
 
 hello_world() ->
     URL = "http://localhost:8080/hello/world",
-    {ok, Response} = lhttpc:request(URL, "GET", [], 1000),
-    ?assertEqual({200, "OK"}, status(Response)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "12"}], headers(Response)),
-    ?assertEqual(<<"Hello World!">>, body(Response)).
+    {ok, Response} = httpc:request(URL),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "12"}], headers(Response)),
+    ?assertEqual("Hello World!", body(Response)).
 
 
 
 not_found() ->
-    {ok, Response} = lhttpc:request("http://localhost:8080/foobarbaz", "GET", [], 1000),
-    ?assertEqual({404, "Not Found"}, status(Response)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "9"}], headers(Response)),
-    ?assertEqual(<<"Not Found">>, body(Response)).
+    {ok, Response} = httpc:request("http://localhost:8080/foobarbaz"),
+    ?assertEqual(404, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "9"}], headers(Response)),
+    ?assertEqual("Not Found", body(Response)).
 
 crash() ->
-    {ok, Response} = lhttpc:request("http://localhost:8080/crash", "GET", [], 1000),
-    ?assertEqual({500, "Internal Server Error"}, status(Response)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "21"}], headers(Response)),
-    ?assertEqual(<<"Internal server error">>, body(Response)).
+    {ok, Response} = httpc:request("http://localhost:8080/crash"),
+    ?assertEqual(500, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "21"}], headers(Response)),
+    ?assertEqual("Internal server error", body(Response)).
 
 
 %% no_compress() ->
@@ -67,32 +67,30 @@ crash() ->
 %%     ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response)).
 
 exception_flow() ->
-    {ok, Response} = lhttpc:request("http://localhost:8080/403", "GET", [], 1000),
-    ?assertEqual({403, "Forbidden"}, status(Response)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "9"}], headers(Response)),
-    ?assertEqual(<<"Forbidden">>, body(Response)).
+    {ok, Response} = httpc:request("http://localhost:8080/403"),
+    ?assertEqual(403, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "9"}], headers(Response)),
+    ?assertEqual("Forbidden", body(Response)).
 
 user_connection() ->
-    {ok, Response} = lhttpc:request("http://localhost:8080/close", "GET", [], 1000),
-    ?assertEqual({200, "OK"}, status(Response)),
-    ?assertEqual([{"Connection", "close"},
-                  {"Content-Length", "7"}], headers(Response)),
-    ?assertEqual(<<"closing">>, body(Response)).
+    {ok, Response} = httpc:request("http://localhost:8080/close"),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "close"},
+                  {"content-length", "7"}], headers(Response)),
+    ?assertEqual("closing", body(Response)).
 
 
 get_args() ->
-    {ok, Response} = lhttpc:request("http://localhost:8080/hello?name=knut",
-                                    "GET", [], 1000),
-    ?assertEqual(<<"Hello knut">>, body(Response)).
+    {ok, Response} = httpc:request("http://localhost:8080/hello?name=knut"),
+    ?assertEqual("Hello knut", body(Response)).
 
 shorthand() ->
-    {ok, Response} = lhttpc:request("http://localhost:8080/shorthand",
-                                    "GET", [], 1000),
-    ?assertEqual({200, "OK"}, status(Response)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "5"}], headers(Response)),
-    ?assertEqual(<<"hello">>, body(Response)).
+    {ok, Response} = httpc:request("http://localhost:8080/shorthand"),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "5"}], headers(Response)),
+    ?assertEqual("hello", body(Response)).
 
 
 
@@ -159,7 +157,7 @@ register_test() ->
 %% HELPERS
 %%
 
-status({Status, _, _}) ->
+status({{_, Status, _}, _, _}) ->
     Status.
 
 body({_, _, Body}) ->
