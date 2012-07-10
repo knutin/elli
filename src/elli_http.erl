@@ -263,7 +263,8 @@ split_args(Qs) ->
 %% RECEIVE REQUEST
 %%
 
--spec get_headers(port(), term(), binary(), callback()) -> headers().
+-spec get_headers(port(), version(), binary(), callback()) ->
+                         {headers(), any()}.
 get_headers(_Socket, {0, 9}, _, _) ->
     {[], <<>>};
 get_headers(Socket, {1, _}, Buffer, Callback) ->
@@ -292,7 +293,7 @@ get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
             end
     end.
 
--spec get_body(port(), headers(), binary(), callback) -> body().
+-spec get_body(port(), headers(), binary(), callback()) -> body().
 get_body(Socket, Headers, Buffer, {Mod, Args}) ->
     case proplists:get_value(<<"Content-Length">>, Headers, undefined) of
         undefined ->
