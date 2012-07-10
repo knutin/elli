@@ -28,7 +28,8 @@
 }).
 
 -record(req, {
-          method :: 'GET' | 'POST',
+          method :: 'OPTIONS' | 'GET' | 'HEAD' | 'POST' |
+                    'PUT' | 'DELETE' | 'TRACE',
           path :: [binary()],
           args,
           raw_path :: binary(),
