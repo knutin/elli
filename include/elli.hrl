@@ -5,7 +5,7 @@
 
 -type path() :: binary().
 -type args() :: binary().
--type version() :: {1,0} | {1,1}.
+-type version() :: {0,9} | {1,0} | {1,1}.
 -type header() :: {Key::binary(), Value::binary() | string()}.
 -type headers() :: [header()].
 -type body() :: binary() | iolist().
