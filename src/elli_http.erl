@@ -219,7 +219,7 @@ error_terminate(_Code, Socket) ->
 
 
 t(Key) ->
-    put({time, Key}, now()).
+    put({time, Key}, os:timestamp()).
 
 get_timings() ->
     lists:flatmap(fun ({{time, Key}, Val}) ->
