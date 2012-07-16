@@ -1,7 +1,7 @@
 {application, elli,
  [
-  {description, ""},
-  {vsn, "1"},
+  {description, "Fast and robust web server for building high-throughput, low-latency apps"},
+  {vsn, "0.1"},
   {registered, []},
   {applications, [
                   kernel,

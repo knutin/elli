@@ -19,29 +19,29 @@ elli_test_() ->
 
 short_circuit() ->
     URL = "http://localhost:8080/middleware/short-circuit",
-    {ok, Response} = lhttpc:request(URL, "GET", [], 1000),
-    ?assertEqual(<<"short circuit!">>, body(Response)).
+    {ok, Response} = httpc:request(URL),
+    ?assertEqual("short circuit!", body(Response)).
 
 hello_world() ->
     URL = "http://localhost:8080/hello/world",
-    {ok, Response} = lhttpc:request(URL, "GET", [], 1000),
-    ?assertEqual(<<"Hello World!">>, body(Response)).
+    {ok, Response} = httpc:request(URL),
+    ?assertEqual("Hello World!", body(Response)).
 
 
 compress() ->
-    {ok, Response} = lhttpc:request("http://localhost:8080/compressed", "GET",
-                                    [{"Accept-Encoding", "gzip"}], 1000),
-    ?assertEqual({200, "OK"}, status(Response)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Encoding", "gzip"},
-                  {"Content-Length", "41"}], headers(Response)),
+    {ok, Response} = httpc:request(get, {"http://localhost:8080/compressed",
+                                         [{"Accept-Encoding", "gzip"}]}, [], []),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-encoding", "gzip"},
+                  {"content-length", "41"}], headers(Response)),
     ?assertEqual(binary:copy(<<"Hello World!">>, 86), zlib:gunzip(body(Response))),
 
-    {ok, Response1} = lhttpc:request("http://localhost:8080/compressed", "GET", [], 1000),
-    ?assertEqual({200, "OK"}, status(Response1)),
-    ?assertEqual([{"Connection", "Keep-Alive"},
-                  {"Content-Length", "1032"}], headers(Response1)),
-    ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response1)).
+    {ok, Response1} = httpc:request("http://localhost:8080/compressed"),
+    ?assertEqual(200, status(Response1)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "1032"}], headers(Response1)),
+    ?assertEqual(lists:flatten(lists:duplicate(86, "Hello World!")), body(Response1)).
 
 
 
@@ -49,7 +49,7 @@ compress() ->
 %% HELPERS
 %%
 
-status({Status, _, _}) ->
+status({{_, Status, _}, _, _}) ->
     Status.
 
 body({_, _, Body}) ->
@@ -63,7 +63,7 @@ setup() ->
     application:start(crypto),
     application:start(public_key),
     application:start(ssl),
-    lhttpc:start(),
+    inets:start(),
 
     %% elli_example_callback:module_info(),
     %% elli_middleware_compress:module_info(),

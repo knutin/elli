@@ -1,6 +1,6 @@
 %% @doc: HTTP request processing middleware.
 %%
-%% This module offers both pre- processing of requests and
+%% This module offers both pre-processing of requests and
 %% post-processing of responses. It can also be used to allow multiple
 %% handlers, where the first handler to return a response
 %% short-circuits the request. It is implemented as a plain elli
@@ -37,11 +37,10 @@
 %%
 
 handle(CleanReq, Config) ->
-    Mods = mods(Config),
+    Mods   = mods(Config),
     PreReq = preprocess(CleanReq, Mods),
     Res    = process(PreReq, Mods),
     postprocess(PreReq, Res, lists:reverse(Mods)).
-
 
 
 handle_event(elli_startup, Args, Config) ->

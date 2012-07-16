@@ -49,7 +49,7 @@ handle('GET', [<<"crash">>], _Req) ->
 
 handle('GET', [<<"compressed">>], _Req) ->
     %% Body with a byte size over 1024 are automatically gzipped
-    {ok, [], binary:copy(<<"Hello World!">>, 86)};
+    {ok, binary:copy(<<"Hello World!">>, 86)};
 
 handle('GET', [<<"chunked">>], Req) ->
     %% Start a chunked response for streaming real-time events to the
@@ -62,7 +62,7 @@ handle('GET', [<<"chunked">>], Req) ->
     %% Return immediately {chunk, Headers} to signal we want to chunk.
     Ref = elli_request:chunk_ref(Req),
     spawn(fun() -> ?MODULE:chunk_loop(Ref) end),
-    {chunk, []};
+    {chunk, [{<<"Content-Type">>, <<"text/event-stream">>}]};
 
 handle('GET', [<<"shorthand">>], _Req) ->
     {200, <<"hello">>};

@@ -1,9 +1,20 @@
+%% @doc: Elli manager
+%%
+%% This is a gen_server that manages the processes accepting
+%% connections on the socket.
+
 -module(elli).
 -behaviour(gen_server).
 -include("elli.hrl").
 
 %% API
--export([start_link/0, start_link/1, stop/1, get_acceptors/1, get_open_reqs/1]).
+-export([start_link/0
+         , start_link/1
+         , stop/1
+         , get_acceptors/1
+         , get_open_reqs/1
+         , get_open_reqs/2
+        ]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -33,7 +44,10 @@ get_acceptors(S) ->
     gen_server:call(S, get_acceptors).
 
 get_open_reqs(S) ->
-    gen_server:call(S, get_open_reqs).
+    get_open_reqs(S, 5000).
+
+get_open_reqs(S, Timeout) ->
+    gen_server:call(S, get_open_reqs, Timeout).
 
 stop(S) ->
     gen_server:call(S, stop).

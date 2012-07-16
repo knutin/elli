@@ -1,8 +1,16 @@
+%% @doc: Elli HTTP request implementation
+%%
+%% An elli_http process blocks in gen_tcp:accept/2 until a client
+%% connects. It then handles requests on that connection until it's
+%% closed either by the client timing out or explicitly by the user.
 -module(elli_http).
 -include("elli.hrl").
 
 -export([start_link/3, accept/3, handle_request/2, chunk_loop/3,
          split_args/1, parse_path/1]).
+
+-export([mk_req/6]). %% useful when testing.
+
 
 -spec start_link(pid(), port(), callback()) -> pid().
 start_link(Server, ListenSocket, Callback) ->
@@ -33,11 +41,8 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    {Path, URL, URLArgs} = parse_path(RawPath),
-    Req = #req{method = Method, path = URL, args = URLArgs, version = V,
-               raw_path = Path,
-               headers = RequestHeaders, body = RequestBody,
-               pid = self(), peer = get_peer(Socket, RequestHeaders)},
+    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V,
+                 get_peer(Socket, RequestHeaders)),
 
     t(user_start),
     case execute_callback(Req, Callback) of
@@ -81,6 +86,15 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                              Args),
             ok
     end.
+
+-spec mk_req(Method::http_method(), RawPath::binary(),
+             RequestHeaders::headers(), RequestBody::body(), V::version(),
+             Peer::inet:ip_address()) -> record(req).
+mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Peer) ->
+    {Path, URL, URLArgs} = parse_path(RawPath),
+    #req{method = Method, path = URL, args = URLArgs, version = V,
+         raw_path = Path, headers = RequestHeaders, body = RequestBody,
+         pid = self(), peer = Peer}.
 
 
 %% @doc: Generates a HTTP response and sends it to the client
@@ -134,7 +148,6 @@ chunk_loop(Socket, Req) ->
 chunk_loop(Socket, Req, open) ->
     receive
         {tcp_closed, Socket} ->
-            io:format("client closed socket~n"),
             ?MODULE:chunk_loop(Socket, Req, closed);
 
         {chunk, <<>>} ->
@@ -163,7 +176,7 @@ chunk_loop(Socket, Req, open) ->
                     From ! {self(), {error, closed}}
             end,
             ?MODULE:chunk_loop(Socket, Req, open)
-    after 1000 ->
+    after 10000 ->
             ?MODULE:chunk_loop(Socket, Req, open)
     end;
 
@@ -171,7 +184,7 @@ chunk_loop(Socket, Req, closed) ->
     receive
         {chunk, _, From} ->
             From ! {self(), {error, closed}}
-    after 1000 ->
+    after 10000 ->
             ?MODULE:chunk_loop(Socket, Req, closed)
     end.
 
@@ -215,7 +228,7 @@ error_terminate(_Code, Socket) ->
 
 
 t(Key) ->
-    put({time, Key}, now()).
+    put({time, Key}, os:timestamp()).
 
 get_timings() ->
     lists:flatmap(fun ({{time, Key}, Val}) ->
@@ -259,7 +272,8 @@ split_args(Qs) ->
 %% RECEIVE REQUEST
 %%
 
--spec get_headers(port(), term(), binary(), callback()) -> headers().
+-spec get_headers(port(), version(), binary(), callback()) ->
+                         {headers(), any()}.
 get_headers(_Socket, {0, 9}, _, _) ->
     {[], <<>>};
 get_headers(Socket, {1, _}, Buffer, Callback) ->
@@ -288,7 +302,7 @@ get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
             end
     end.
 
--spec get_body(port(), headers(), binary(), callback) -> body().
+-spec get_body(port(), headers(), binary(), callback()) -> body().
 get_body(Socket, Headers, Buffer, {Mod, Args}) ->
     case proplists:get_value(<<"Content-Length">>, Headers, undefined) of
         undefined ->
@@ -335,7 +349,8 @@ encode_headers([{K, V} | H]) ->
 
 
 encode_value(V) when is_integer(V) -> ?i2l(V);
-encode_value(V) when is_binary(V)  -> V.
+encode_value(V) when is_binary(V)  -> V;
+encode_value(V) when is_list(V) -> list_to_binary(V).
 
 
 connection_token(#req{version = {1, 1}, headers = Headers}) ->
