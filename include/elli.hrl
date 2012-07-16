@@ -1,5 +1,5 @@
 
--type callback_mod() :: atom.
+-type callback_mod() :: atom().
 -type callback_args() :: any().
 -type callback() :: {callback_mod(), callback_args()}.
 
@@ -10,8 +10,9 @@
 -type headers() :: [header()].
 -type body() :: binary() | iolist().
 -type response() :: iolist().
-
--type response_code() :: 200 | 404 | 500.
+-type http_method() :: 'OPTIONS' | 'GET' | 'HEAD' | 'POST' |
+                       'PUT' | 'DELETE' | 'TRACE'.
+-type response_code() :: 100..999.
 -type connection_token_atom() :: keep_alive | close.
 
 -define(l2i(L), list_to_integer(L)).
@@ -28,12 +29,11 @@
 }).
 
 -record(req, {
-          method :: 'OPTIONS' | 'GET' | 'HEAD' | 'POST' |
-                    'PUT' | 'DELETE' | 'TRACE',
+          method :: http_method(),
           path :: [binary()],
-          args,
+          args :: [{binary(), any()}],
           raw_path :: binary(),
-          version,
+          version :: version(),
           headers :: headers(),
           body :: body(),
           pid :: pid(),
