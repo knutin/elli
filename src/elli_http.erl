@@ -9,6 +9,9 @@
 -export([start_link/3, accept/3, handle_request/2, chunk_loop/3,
          split_args/1, parse_path/1]).
 
+-export([mk_req/6]). %% useful when testing.
+
+
 -spec start_link(pid(), port(), callback()) -> pid().
 start_link(Server, ListenSocket, Callback) ->
     spawn_link(?MODULE, accept, [Server, ListenSocket, Callback]).
@@ -38,11 +41,8 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    {Path, URL, URLArgs} = parse_path(RawPath),
-    Req = #req{method = Method, path = URL, args = URLArgs, version = V,
-               raw_path = Path,
-               headers = RequestHeaders, body = RequestBody,
-               pid = self(), peer = get_peer(Socket, RequestHeaders)},
+    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V,
+                 get_peer(Socket, RequestHeaders)),
 
     t(user_start),
     case execute_callback(Req, Callback) of
@@ -86,6 +86,15 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                              Args),
             ok
     end.
+
+-spec mk_req(Method::http_method(), RawPath::binary(),
+             RequestHeaders::headers(), RequestBody::body(), V::version(),
+             Peer::inet:ip_address()) -> record(req).
+mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Peer) ->
+    {Path, URL, URLArgs} = parse_path(RawPath),
+    #req{method = Method, path = URL, args = URLArgs, version = V,
+         raw_path = Path, headers = RequestHeaders, body = RequestBody,
+         pid = self(), peer = Peer}.
 
 
 %% @doc: Generates a HTTP response and sends it to the client
