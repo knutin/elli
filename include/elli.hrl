@@ -1,5 +1,5 @@
 
--type callback_mod() :: atom().
+-type callback_mod() :: module().
 -type callback_args() :: any().
 -type callback() :: {callback_mod(), callback_args()}.
 
