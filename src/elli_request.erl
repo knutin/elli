@@ -55,7 +55,7 @@ body_qs(#req{body = Body}) ->
 -spec get_args(#req{}) -> QueryArgs :: proplists:proplist().
 %% @doc Returns a proplist of keys and values of the original query
 %%      string.  Both keys and values in the returned proplists will
-%%      be binaries or the atom `true` in case no value was supplied
+%%      be binaries or the atom `true' in case no value was supplied
 %%      for the query key.
 get_args(#req{args = Args}) -> Args.
 
