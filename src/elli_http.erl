@@ -18,14 +18,13 @@ start_link(Server, ListenSocket, Callback) ->
 
 -spec accept(pid(), port(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
-%% request and loops if we're using keep alive or chunked transfer.
+%% request, then loops if we're using keep alive or chunked transfer.
 accept(Server, ListenSocket, Callback) ->
     case catch gen_tcp:accept(ListenSocket, 1000) of
         {ok, Socket} ->
             t(accepted),
             gen_server:cast(Server, accepted),
-            ?MODULE:handle_request(Socket, Callback),
-            ok;
+            ?MODULE:handle_request(Socket, Callback);
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
         {error, closed} ->
@@ -134,6 +133,11 @@ execute_callback(Req, {Mod, Args}) ->
     end.
 
 
+%%
+%% CHUNKED-TRANSFER
+%%
+
+
 %% @doc: The chunk loop is an intermediary between the socket and the
 %% user. We forward anythingthe user sends until the user sends an
 %% empty response, which signals that the connection should be
@@ -194,7 +198,11 @@ send_chunk(Socket, Data) ->
     gen_tcp:send(Socket, Response).
 
 
+%%
+%% RECEIVE REQUEST
+%%
 
+%% @doc: Retrieves the request line
 get_request(Socket, Callback) ->
     get_request(Socket, <<>>, Callback).
 
@@ -207,7 +215,9 @@ get_request(Socket, Buffer, {Mod, Args} = Callback) ->
                     {Method, RawPath, Version, Rest};
                 {ok, {http_error, _}, _} ->
                     Mod:handle_event(request_parse_error, [NewBuffer], Args),
-                    error_terminate(400, Socket);
+                    gen_tcp:send(Socket, status(400)),
+                    gen_tcp:close(Socket),
+                    exit(normal);
                 {more, _} ->
                     get_request(Socket, NewBuffer, Callback)
             end;
@@ -220,56 +230,6 @@ get_request(Socket, Buffer, {Mod, Args} = Callback) ->
     end.
 
 
-error_terminate(_Code, Socket) ->
-    gen_tcp:send(Socket, [<<"400 Bad Request">>]),
-    gen_tcp:close(Socket),
-    exit(normal).
-
-
-t(Key) ->
-    put({time, Key}, os:timestamp()).
-
-get_timings() ->
-    lists:flatmap(fun ({{time, Key}, Val}) ->
-                          if
-                              Key =:= accepted -> ok;
-                              true -> erase({time, Key})
-                          end,
-                          [{Key, Val}];
-                     (_) ->
-                          []
-                 end, get()).
-
-
-parse_path({abs_path, FullPath}) ->
-    case binary:split(FullPath, [<<"?">>]) of
-        [URL]       -> {FullPath, split_path(URL), []};
-        [URL, Args] -> {FullPath, split_path(URL), split_args(Args)}
-    end.
-
-split_path(<<"/", Path/binary>>) ->
-    binary:split(Path, [<<"/">>], [global, trim]);
-split_path(Path) ->
-    binary:split(Path, [<<"/">>], [global, trim]).
-
-
-
-
-%% @doc: Splits the url arguments into a proplist. Lifted from
-%% cowboy_http:x_www_form_urlencoded/2
--spec split_args(binary()) -> list({binary(), binary() | true}).
-split_args(<<>>) ->
-	[];
-split_args(Qs) ->
-	Tokens = binary:split(Qs, <<"&">>, [global, trim]),
-	[case binary:split(Token, <<"=">>) of
-		[Token] -> {Token, true};
-		[Name, Value] -> {Name, Value}
-	end || Token <- Tokens].
-
-%%
-%% RECEIVE REQUEST
-%%
 
 -spec get_headers(port(), version(), binary(), callback()) ->
                          {headers(), any()}.
@@ -387,9 +347,59 @@ connection(Req, UserHeaders) ->
             []
     end.
 
-
 content_length(Body)->
     {<<"Content-Length">>, iolist_size(Body)}.
+
+%%
+%% PATH HELPERS
+%%
+
+parse_path({abs_path, FullPath}) ->
+    case binary:split(FullPath, [<<"?">>]) of
+        [URL]       -> {FullPath, split_path(URL), []};
+        [URL, Args] -> {FullPath, split_path(URL), split_args(Args)}
+    end.
+
+split_path(<<"/", Path/binary>>) ->
+    binary:split(Path, [<<"/">>], [global, trim]);
+split_path(Path) ->
+    binary:split(Path, [<<"/">>], [global, trim]).
+
+
+%% @doc: Splits the url arguments into a proplist. Lifted from
+%% cowboy_http:x_www_form_urlencoded/2
+-spec split_args(binary()) -> list({binary(), binary() | true}).
+split_args(<<>>) ->
+	[];
+split_args(Qs) ->
+	Tokens = binary:split(Qs, <<"&">>, [global, trim]),
+	[case binary:split(Token, <<"=">>) of
+		[Token] -> {Token, true};
+		[Name, Value] -> {Name, Value}
+	end || Token <- Tokens].
+
+
+%%
+%% TIMING HELPERS
+%%
+
+%% @doc: Record the current time in the process dictionary. This
+%% allows easily adding time tracing wherever, without passing along
+%% any variables.
+t(Key) ->
+    put({time, Key}, os:timestamp()).
+
+get_timings() ->
+    lists:flatmap(fun ({{time, Key}, Val}) ->
+                          if
+                              Key =:= accepted -> ok;
+                              true -> erase({time, Key})
+                          end,
+                          [{Key, Val}];
+                     (_) ->
+                          []
+                 end, get()).
+
 
 
 
