@@ -41,8 +41,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V,
-                 get_peer(Socket, RequestHeaders)),
+    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket),
 
     t(user_start),
     case execute_callback(Req, Callback) of
@@ -89,12 +88,12 @@ handle_request(Socket, {Mod, Args} = Callback) ->
 
 -spec mk_req(Method::http_method(), RawPath::binary(),
              RequestHeaders::headers(), RequestBody::body(), V::version(),
-             Peer::inet:ip_address()) -> record(req).
-mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Peer) ->
+             Socket::inet:socket()) -> record(req).
+mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket) ->
     {Path, URL, URLArgs} = parse_path(RawPath),
     #req{method = Method, path = URL, args = URLArgs, version = V,
          raw_path = Path, headers = RequestHeaders, body = RequestBody,
-         pid = self(), peer = Peer}.
+         pid = self(), socket = Socket}.
 
 
 %% @doc: Generates a HTTP response and sends it to the client
@@ -386,21 +385,6 @@ connection(Req, UserHeaders) ->
             {<<"Connection">>, connection_token(Req)};
         _ ->
             []
-    end.
-
-
-
-get_peer(Socket, Headers) ->
-    case proplists:get_value(<<"X-Forwarded-For">>, Headers) of
-        undefined ->
-            case inet:peername(Socket) of
-                {ok, {Address, _}} ->
-                    list_to_binary(inet_parse:ntoa(Address));
-                {error, _} ->
-                    undefined
-            end;
-        Ip ->
-            Ip
     end.
 
 

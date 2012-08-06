@@ -26,12 +26,25 @@
 
 
 %% @doc: Returns path split into binary parts.
-path(#req{path = Path})                     -> Path.
-raw_path(#req{raw_path = Path})             -> Path.
-headers(#req{headers = Headers})            -> Headers.
-peer(#req{peer = Peer})                     -> Peer.
-method(#req{method = Method})               -> Method.
-body(#req{body = Body})                     -> Body.
+path(#req{path = Path})          -> Path.
+raw_path(#req{raw_path = Path})  -> Path.
+headers(#req{headers = Headers}) -> Headers.
+method(#req{method = Method})    -> Method.
+body(#req{body = Body})          -> Body.
+
+peer(#req{socket = Socket} = Req) ->
+    case get_header(<<"X-Forwarded-For">>, Req, undefined) of
+        undefined ->
+            case inet:peername(Socket) of
+                {ok, {Address, _}} ->
+                    list_to_binary(inet_parse:ntoa(Address));
+                {error, _} ->
+                    undefined
+            end;
+        Ip ->
+            Ip
+    end.
+
 
 get_header(Key, #req{headers = Headers}) ->
     proplists:get_value(Key, Headers).

@@ -120,7 +120,7 @@ to_proplist_test() ->
                headers = [{<<"Host">>,<<"localhost:8080">>}],
                body = <<>>,
                pid = self(),
-               peer = <<"127.0.0.1">>},
+               socket = socket},
 
     Prop = [{method,'GET'},
             {path,[<<"crash">>]},
@@ -130,7 +130,7 @@ to_proplist_test() ->
             {headers,[{<<"Host">>,<<"localhost:8080">>}]},
             {body,<<>>},
             {pid,self()},
-            {peer,<<"127.0.0.1">>}],
+            {socket,socket}],
     ?assertEqual(Prop, elli_request:to_proplist(Req)).
 
 

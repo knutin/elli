@@ -37,5 +37,5 @@
           headers :: headers(),
           body :: body(),
           pid :: pid(),
-          peer :: inet:ip_address()
+          socket :: inet:socket()
 }).
