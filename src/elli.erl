@@ -61,6 +61,7 @@ init([Opts]) ->
     process_flag(trap_exit, true),
     Callback = required_opt(callback, Opts),
     CallbackArgs = proplists:get_value(callback_args, Opts),
+    IPAddress = proplists:get_value(ip, Opts, {0,0,0,0}),
     Port = proplists:get_value(port, Opts, 8080),
     MinAcceptors = proplists:get_value(min_acceptors, Opts, 20),
 
@@ -70,6 +71,7 @@ init([Opts]) ->
     ok = Callback:handle_event(elli_startup, [], CallbackArgs),
 
     {ok, Socket} = gen_tcp:listen(Port, [binary,
+                                         {ip, IPAddress},
                                          {reuseaddr, true},
                                          {backlog, 32768},
                                          {packet, raw},
