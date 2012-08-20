@@ -73,7 +73,7 @@ setup() ->
     Config = [
               {mods, [
                       {elli_access_log, [{name, elli_syslog},
-                                         {ip, "127.0.01"},
+                                         {ip, "127.0.0.1"},
                                          {port, 514}]},
                       {elli_example_middleware, []},
                       {elli_middleware_compress, []},
