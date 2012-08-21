@@ -27,6 +27,8 @@ accept(Server, ListenSocket, Callback) ->
             ?MODULE:handle_request(Socket, Callback);
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
+        {error, econnaborted} ->
+            ?MODULE:accept(Server, ListenSocket, Callback);
         {error, closed} ->
             ok
     end.
