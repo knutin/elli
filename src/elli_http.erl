@@ -84,7 +84,28 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             Mod:handle_event(request_complete,
                              [Req, 200, ResponseHeaders, <<>>, get_timings()],
                              Args),
-            ok
+            ok;
+
+        {file, ResponseCode, UserHeaders, Filename} ->
+            t(user_end),
+
+            %% Handlers sending files should provide Content-Length header
+            ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
+            send_file(Socket, ResponseCode, ResponseHeaders, Filename, Callback),
+
+            t(request_end),
+
+            Mod:handle_event(request_complete,
+                             [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
+                             Args),
+
+            case close_or_keepalive(Req, UserHeaders) of
+                keep_alive ->
+                    ?MODULE:handle_request(Socket, Callback);
+                close ->
+                    gen_tcp:close(Socket),
+                    ok
+            end
     end.
 
 -spec mk_req(Method::http_method(), RawPath::binary(),
@@ -110,16 +131,39 @@ send_response(Socket, Code, Headers, Body, {Mod, Args}) ->
             ok
     end.
 
+
+%% @doc: Generate and send HTTP headers to the client
+send_file(Socket, Code, Headers, Filename, {Mod, Args}) ->
+    ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
+                       encode_headers(Headers), <<"\r\n">>],
+
+    case gen_tcp:send(Socket, ResponseHeaders) of
+        ok ->
+            case file:sendfile(Filename, Socket) of
+                {ok, _BytesSent} -> ok;
+                {error, closed} ->
+                    Mod:handle_event(client_closed, [before_response], Args),
+                    ok
+            end;
+        {error, closed} ->
+            Mod:handle_event(client_closed, [before_response], Args),
+            ok
+    end.
+
+
+
 %% @doc: Executes the user callback, translating failure into a proper
 %% response.
 execute_callback(Req, {Mod, Args}) ->
     try Mod:handle(Req, Args) of
-        {ok, Headers, Body}       -> {response, 200, Headers, Body};
-        {ok, Body}                -> {response, 200, [], Body};
-        {chunk, Headers}          -> {chunk, Headers, <<"">>};
-        {chunk, Headers, Initial} -> {chunk, Headers, Initial};
-        {HttpCode, Headers, Body} -> {response, HttpCode, Headers, Body};
-        {HttpCode, Body}          -> {response, HttpCode, [], Body}
+        {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename};
+        {ok, Headers, Body}                   -> {response, 200, Headers, Body};
+        {ok, Body}                            -> {response, 200, [], Body};
+        {chunk, Headers}                      -> {chunk, Headers, <<"">>};
+        {chunk, Headers, Initial}             -> {chunk, Headers, Initial};
+        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename};
+        {HttpCode, Headers, Body}             -> {response, HttpCode, Headers, Body};
+        {HttpCode, Body}                      -> {response, HttpCode, [], Body}
     catch
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             {response, ResponseCode, Headers, Body};
