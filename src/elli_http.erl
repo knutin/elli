@@ -132,7 +132,8 @@ send_response(Socket, Code, Headers, Body, {Mod, Args}) ->
     end.
 
 
-%% @doc: Generate and send HTTP headers to the client
+%% @doc: Generates and sends a HTTP response to the client where the body
+%% is the contents of the given file.
 send_file(Socket, Code, Headers, Filename, {Mod, Args}) ->
     ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                        encode_headers(Headers), <<"\r\n">>],
