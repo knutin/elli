@@ -145,8 +145,6 @@ init([]) ->
 ## Roadmap
 
  * Add proper `Date` header as clients use this for computing cache expirations
- * "Media" middleware for serving up static files from disk under a certain path
- * Sendfile
 
 
 ## Extensions
@@ -154,3 +152,4 @@ init([]) ->
  * Access log: https://github.com/knutin/elli/blob/master/src/elli_access_log.erl
  * Real-time statistics dashboard: https://github.com/knutin/elli_stats
  * Basic auth: https://github.com/martinrehfeld/elli_basicauth
+ * Static content: https://github.com/chrisavl/elli_fileserve
