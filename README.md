@@ -142,14 +142,10 @@ init([]) ->
 ```
 
 
-## Roadmap
-
- * Add proper `Date` header as clients use this for computing cache expirations
-
-
 ## Extensions
 
  * Access log: https://github.com/knutin/elli/blob/master/src/elli_access_log.erl
  * Real-time statistics dashboard: https://github.com/knutin/elli_stats
  * Basic auth: https://github.com/martinrehfeld/elli_basicauth
  * Static content: https://github.com/chrisavl/elli_fileserve
+ * "Date" header: https://github.com/knutin/elli_date
