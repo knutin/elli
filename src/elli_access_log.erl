@@ -35,7 +35,7 @@ handle(_Req, _Args) ->
 
 
 handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
-                                ResponseBody, Timings], Config) ->
+                                ResponseBody, Timings], Args) ->
 
     Accepted     = proplists:get_value(accepted, Timings),
     RequestStart = proplists:get_value(request_start, Timings),
@@ -62,19 +62,19 @@ handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
                          elli_request:raw_path(Req)
                         ]),
 
-    log(Msg, Config),
+    log(Msg, Args),
     ok;
 
-handle_event(request_throw, [Req, Exception, Stack], _Config) ->
+handle_event(request_throw, [Req, Exception, Stack], _Args) ->
     error_logger:error_msg("exception: ~p~nstack: ~p~nrequest: ~p~n",
                            [Exception, Stack, elli_request:to_proplist(Req)]),
     ok;
-handle_event(request_exit, [Req, Exit, Stack], _Config) ->
+handle_event(request_exit, [Req, Exit, Stack], _Args) ->
     error_logger:error_msg("exit: ~p~nstack: ~p~nrequest: ~p~n",
                            [Exit, Stack, elli_request:to_proplist(Req)]),
     ok;
 
-handle_event(request_error, [Req, Error, Stack], _Config) ->
+handle_event(request_error, [Req, Error, Stack], _Args) ->
     error_logger:error_msg("error: ~p~nstack: ~p~nrequest: ~p~n",
                            [Error, Stack, elli_request:to_proplist(Req)]),
     ok;
@@ -82,17 +82,17 @@ handle_event(request_error, [Req, Error, Stack], _Config) ->
 handle_event(request_parse_error, [_Data], _Args) ->
     ok;
 
-handle_event(client_closed, [_When], _Config) ->
+handle_event(client_closed, [_When], _Args) ->
     ok;
 
-handle_event(client_timeout, [_When], _Config) ->
+handle_event(client_timeout, [_When], _Args) ->
     ok;
-handle_event(elli_startup, [], Config) ->
-    case whereis(proplists:get_value(name, Config)) of
+handle_event(elli_startup, [], Args) ->
+    case whereis(proplists:get_value(name, Args)) of
         undefined ->
-            {ok, _Pid} = syslog:start_link(proplists:get_value(name, Config),
-                                          proplists:get_value(ip, Config),
-                                          proplists:get_value(port, Config)),
+            {ok, _Pid} = syslog:start_link(proplists:get_value(name, Args),
+                                          proplists:get_value(ip, Args),
+                                          proplists:get_value(port, Args)),
             ok;
         Pid when is_pid(Pid) ->
             ok
@@ -102,8 +102,8 @@ handle_event(elli_startup, [], Config) ->
 
 
 
-log(Msg, Config) ->
-    syslog:send(proplists:get_value(name, Config), Msg,
+log(Msg, Args) ->
+    syslog:send(proplists:get_value(name, Args), Msg,
                 [{ident, node()},
-                 {facility, proplists:get_value(facility, Config, local0)}
+                 {facility, proplists:get_value(facility, Args, local0)}
                 ]).
