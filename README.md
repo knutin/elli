@@ -4,9 +4,6 @@ Elli is a webserver aimed exclusively at building high-throughput,
 low-latency HTTP APIs. If robustness and performance is more important
 than a wide feature set, then `elli` might be for you.
 
-Even though it is very early and Elli still has many rough edges, it
-is used in production at Wooga.
-
 Feedback and pull requests welcome!
 
 ## About
@@ -15,22 +12,21 @@ From operating and debugging high-volume, low-latency apps we have
 gained some valuable insight into what we want from a webserver. We
 want simplicity, robustness, performance, ease of debugging,
 visibility into strange client behaviour, really good instrumentation
-and good tests. We are willing to sacrifice basic features to achieve
-this.
+and good tests. We are willing to sacrifice almost everything, even
+basic features to achieve this.
 
 With this in mind we looked at the big names in the Erlang community:
 Yaws, Mochiweb, Misultin and Cowboy. We found Mochiweb to be the best
-match and we might eventually end up settling for it. However, we also
-wanted to see if we could take the architecture of Mochiweb and
-improve on it. `elli` takes the acceptor-turns-into-request-handler
-idea found in Mochiweb, the binaries-only idea from Cowboy and the
-request-response idea from WSGI/Rack (with chunked transfer being an
-exception).
+match. However, we also wanted to see if we could take the
+architecture of Mochiweb and improve on it. `elli` takes the
+acceptor-turns-into-request-handler idea found in Mochiweb, the
+binaries-only idea from Cowboy and the request-response idea from
+WSGI/Rack (with chunked transfer being an exception).
 
 On top of this we built a handler that allows us to write HTTP
 middleware modules to add practical features, like compression of
-responses, access with timings, statistics dashboard and multiple
-request handlers.
+responses, HTTP access log with timings, a real-time statistics
+dashboard and chaining multiple request handlers.
 
 ## Aren't there enough webservers in the Erlang community already?
 
@@ -41,17 +37,35 @@ webserver, but more of a specialized tool, we believe it has a very
 different target audience and would not attract effort or users away
 from the big names.
 
+## Why write another webserver? Isn't this just the NIH syndrome?
+
+Yaws, Mochiweb, Misultin and Cowboy are great projects, hardened over
+time and full of very useful features for web development. If you
+value developer productivity, Yaws is an excellent choice. If you want
+a fast and lightweight server, Mochiweb, Misultin and Cowboy are all
+excellent choices.
+
+Having used and studied all of these projects, we believed that if we
+merged some of the existing ideas and added some ideas from other
+communities, we could create a core that was better for our use cases.
+
+It started out as an experiment to see if it is at all possible to
+significantly improve and it turns out that for our particular use
+cases, there is enough improvement to warrant a new project.
+
 ## Performance
 
 "Hello World!" micro-benchmarks are really useful when measuring the
-performance, but the numbers usually do more harm than good when
-released. For this reason I include an ApacheBench script
-(`bin/ab.sh`) and encourage you to run the benchmarks on your own.
+performance of the webserver itself, but the numbers usually do more
+harm than good when released. I encourage you to run your own
+benchmarks, on your own hardware. Mark Nottingham has some
+[very good pointers](http://www.mnot.net/blog/2011/05/18/http_benchmark_rules)
+about benchmarking HTTP servers.
 
 ## Installation
 
-Add elli to you application by adding it as a dependency to you rebar
-config.
+Add elli to your application by adding it as a dependency to your
+rebar config.
 
 ```erlang
 % rebar.config:
@@ -71,13 +85,10 @@ $: ./rebar compile
 
 ## Usage
 ```
-$: erl -pa ebin
+$: erl -pa deps/*/ebin ebin
 
 % starting elli
 1>: {ok, Pid} = elli:start_link([{callback, elli_example_callback}, {port, 3000}]).
-
-% stopping elli
-2>: elli:stop(Pid).
 ```
 
 ## Callback module
@@ -91,7 +102,7 @@ A minimal callback module could look like this:
 -module(elli_minimal_callback).
 -export([handle/2, handle_event/3]).
 
--include("elli.hrl").
+-include_lib("elli/include/elli.hrl").
 -behaviour(elli_handler).
 
 handle(Req, _Args) ->
@@ -143,15 +154,10 @@ init([]) ->
 ```
 
 
-## Roadmap
-
- * Add proper `Date` header as clients use this for computing cache expirations
- * "Media" middleware for serving up static files from disk under a certain path
- * Sendfile
-
-
 ## Extensions
 
  * Access log: https://github.com/knutin/elli/blob/master/src/elli_access_log.erl
  * Real-time statistics dashboard: https://github.com/knutin/elli_stats
  * Basic auth: https://github.com/martinrehfeld/elli_basicauth
+ * Static content: https://github.com/chrisavl/elli_fileserve
+ * "Date" header: https://github.com/knutin/elli_date

@@ -18,15 +18,16 @@ start_link(Server, ListenSocket, Callback) ->
 
 -spec accept(pid(), port(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
-%% request and loops if we're using keep alive or chunked transfer.
+%% request, then loops if we're using keep alive or chunked transfer.
 accept(Server, ListenSocket, Callback) ->
     case catch gen_tcp:accept(ListenSocket, 1000) of
         {ok, Socket} ->
             t(accepted),
             gen_server:cast(Server, accepted),
-            ?MODULE:handle_request(Socket, Callback),
-            ok;
+            ?MODULE:handle_request(Socket, Callback);
         {error, timeout} ->
+            ?MODULE:accept(Server, ListenSocket, Callback);
+        {error, econnaborted} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
         {error, closed} ->
             ok
@@ -41,8 +42,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V,
-                 get_peer(Socket, RequestHeaders)),
+    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket),
 
     t(user_start),
     case execute_callback(Req, Callback) of
@@ -84,17 +84,38 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             Mod:handle_event(request_complete,
                              [Req, 200, ResponseHeaders, <<>>, get_timings()],
                              Args),
-            ok
+            ok;
+
+        {file, ResponseCode, UserHeaders, Filename} ->
+            t(user_end),
+
+            %% Handlers sending files should provide Content-Length header
+            ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
+            send_file(Socket, ResponseCode, ResponseHeaders, Filename, Callback),
+
+            t(request_end),
+
+            Mod:handle_event(request_complete,
+                             [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
+                             Args),
+
+            case close_or_keepalive(Req, UserHeaders) of
+                keep_alive ->
+                    ?MODULE:handle_request(Socket, Callback);
+                close ->
+                    gen_tcp:close(Socket),
+                    ok
+            end
     end.
 
 -spec mk_req(Method::http_method(), RawPath::binary(),
              RequestHeaders::headers(), RequestBody::body(), V::version(),
-             Peer::inet:ip_address()) -> record(req).
-mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Peer) ->
+             Socket::inet:socket()) -> record(req).
+mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket) ->
     {Path, URL, URLArgs} = parse_path(RawPath),
     #req{method = Method, path = URL, args = URLArgs, version = V,
          raw_path = Path, headers = RequestHeaders, body = RequestBody,
-         pid = self(), peer = Peer}.
+         pid = self(), socket = Socket}.
 
 
 %% @doc: Generates a HTTP response and sends it to the client
@@ -110,16 +131,42 @@ send_response(Socket, Code, Headers, Body, {Mod, Args}) ->
             ok
     end.
 
+
+%% @doc: Generates and sends a HTTP response to the client where the body
+%% is the contents of the given file.
+send_file(Socket, Code, Headers, Filename, {Mod, Args}) ->
+    ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
+                       encode_headers(Headers), <<"\r\n">>],
+
+    case gen_tcp:send(Socket, ResponseHeaders) of
+        ok ->
+            case file:sendfile(Filename, Socket) of
+                {ok, _BytesSent} -> ok;
+                {error, closed} ->
+                    Mod:handle_event(client_closed, [before_response], Args),
+                    ok
+            end;
+        {error, closed} ->
+            Mod:handle_event(client_closed, [before_response], Args),
+            ok
+    end.
+
+send_bad_request(Socket) ->
+    Response = [<<"HTTP/1.1 ">>, status(400), <<"\r\n">>],
+    gen_tcp:send(Socket, Response).
+
 %% @doc: Executes the user callback, translating failure into a proper
 %% response.
 execute_callback(Req, {Mod, Args}) ->
     try Mod:handle(Req, Args) of
-        {ok, Headers, Body}       -> {response, 200, Headers, Body};
-        {ok, Body}                -> {response, 200, [], Body};
-        {chunk, Headers}          -> {chunk, Headers, <<"">>};
-        {chunk, Headers, Initial} -> {chunk, Headers, Initial};
-        {HttpCode, Headers, Body} -> {response, HttpCode, Headers, Body};
-        {HttpCode, Body}          -> {response, HttpCode, [], Body}
+        {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename};
+        {ok, Headers, Body}                   -> {response, 200, Headers, Body};
+        {ok, Body}                            -> {response, 200, [], Body};
+        {chunk, Headers}                      -> {chunk, Headers, <<"">>};
+        {chunk, Headers, Initial}             -> {chunk, Headers, Initial};
+        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename};
+        {HttpCode, Headers, Body}             -> {response, HttpCode, Headers, Body};
+        {HttpCode, Body}                      -> {response, HttpCode, [], Body}
     catch
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             {response, ResponseCode, Headers, Body};
@@ -133,6 +180,11 @@ execute_callback(Req, {Mod, Args}) ->
             Mod:handle_event(request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
             {response, 500, [], <<"Internal server error">>}
     end.
+
+
+%%
+%% CHUNKED-TRANSFER
+%%
 
 
 %% @doc: The chunk loop is an intermediary between the socket and the
@@ -195,7 +247,11 @@ send_chunk(Socket, Data) ->
     gen_tcp:send(Socket, Response).
 
 
+%%
+%% RECEIVE REQUEST
+%%
 
+%% @doc: Retrieves the request line
 get_request(Socket, Callback) ->
     get_request(Socket, <<>>, Callback).
 
@@ -208,7 +264,9 @@ get_request(Socket, Buffer, {Mod, Args} = Callback) ->
                     {Method, RawPath, Version, Rest};
                 {ok, {http_error, _}, _} ->
                     Mod:handle_event(request_parse_error, [NewBuffer], Args),
-                    error_terminate(400, Socket);
+                    send_bad_request(Socket),
+                    gen_tcp:close(Socket),
+                    exit(normal);
                 {more, _} ->
                     get_request(Socket, NewBuffer, Callback)
             end;
@@ -221,56 +279,6 @@ get_request(Socket, Buffer, {Mod, Args} = Callback) ->
     end.
 
 
-error_terminate(_Code, Socket) ->
-    gen_tcp:send(Socket, [<<"400 Bad Request">>]),
-    gen_tcp:close(Socket),
-    exit(normal).
-
-
-t(Key) ->
-    put({time, Key}, now()).
-
-get_timings() ->
-    lists:flatmap(fun ({{time, Key}, Val}) ->
-                          if
-                              Key =:= accepted -> ok;
-                              true -> erase({time, Key})
-                          end,
-                          [{Key, Val}];
-                     (_) ->
-                          []
-                 end, get()).
-
-
-parse_path({abs_path, FullPath}) ->
-    case binary:split(FullPath, [<<"?">>]) of
-        [URL]       -> {FullPath, split_path(URL), []};
-        [URL, Args] -> {FullPath, split_path(URL), split_args(Args)}
-    end.
-
-split_path(<<"/", Path/binary>>) ->
-    binary:split(Path, [<<"/">>], [global, trim]);
-split_path(Path) ->
-    binary:split(Path, [<<"/">>], [global, trim]).
-
-
-
-
-%% @doc: Splits the url arguments into a proplist. Lifted from
-%% cowboy_http:x_www_form_urlencoded/2
--spec split_args(binary()) -> list({binary(), binary() | true}).
-split_args(<<>>) ->
-	[];
-split_args(Qs) ->
-	Tokens = binary:split(Qs, <<"&">>, [global, trim]),
-	[case binary:split(Token, <<"=">>) of
-		[Token] -> {Token, true};
-		[Name, Value] -> {Name, Value}
-	end || Token <- Tokens].
-
-%%
-%% RECEIVE REQUEST
-%%
 
 -spec get_headers(port(), version(), binary(), callback()) ->
                          {headers(), any()}.
@@ -279,6 +287,11 @@ get_headers(_Socket, {0, 9}, _, _) ->
 get_headers(Socket, {1, _}, Buffer, Callback) ->
     get_headers(Socket, Buffer, [], 0, Callback).
 
+get_headers(Socket, _, Headers, HeadersCount, {Mod, Args}) when HeadersCount >= 100 ->
+    Mod:handle_event(bad_request, [{too_many_headers, Headers}], Args),
+    send_bad_request(Socket),
+    gen_tcp:close(Socket),
+    exit(normal);
 get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
     case erlang:decode_packet(httph_bin, Buffer, []) of
         {ok, {http_header, _, Key, _, Value}, Rest} ->
@@ -309,24 +322,30 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
             <<>>;
         ContentLengthBin ->
             ContentLength = ?b2i(ContentLengthBin),
-            BufSize = byte_size(Buffer),
 
-            case ContentLength - BufSize of
-                0 ->
-                    Buffer;
-                N ->
-                    case gen_tcp:recv(Socket, N, 30000) of
-                        {ok, Data} ->
-                            <<Buffer/binary, Data/binary>>;
-                        {error, closed} ->
-                            Mod:handle_event(client_closed, [receiving_body], Args),
-                            ok = gen_tcp:close(Socket),
-                            exit(normal);
-                        {error, timeout} ->
-                            Mod:handle_event(client_timeout, [receiving_body], Args),
-                            ok = gen_tcp:close(Socket),
-                            exit(normal)
-                    end
+            case ContentLength < 10240 of
+                true ->
+                    case ContentLength - byte_size(Buffer) of
+                        0 ->
+                            Buffer;
+                        N ->
+                            case gen_tcp:recv(Socket, N, 30000) of
+                                {ok, Data} ->
+                                    <<Buffer/binary, Data/binary>>;
+                                {error, closed} ->
+                                    Mod:handle_event(client_closed, [receiving_body], Args),
+                                    ok = gen_tcp:close(Socket),
+                                    exit(normal);
+                                {error, timeout} ->
+                                    Mod:handle_event(client_timeout, [receiving_body], Args),
+                                    ok = gen_tcp:close(Socket),
+                                    exit(normal)
+                            end
+                    end;
+                false ->
+                    Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),
+                    gen_tcp:close(Socket),
+                    exit(normal)
             end
     end.
 
@@ -388,24 +407,59 @@ connection(Req, UserHeaders) ->
             []
     end.
 
-
-
-get_peer(Socket, Headers) ->
-    case proplists:get_value(<<"X-Forwarded-For">>, Headers) of
-        undefined ->
-            case inet:peername(Socket) of
-                {ok, {Address, _}} ->
-                    list_to_binary(inet_parse:ntoa(Address));
-                {error, _} ->
-                    undefined
-            end;
-        Ip ->
-            Ip
-    end.
-
-
 content_length(Body)->
     {<<"Content-Length">>, iolist_size(Body)}.
+
+%%
+%% PATH HELPERS
+%%
+
+parse_path({abs_path, FullPath}) ->
+    case binary:split(FullPath, [<<"?">>]) of
+        [URL]       -> {FullPath, split_path(URL), []};
+        [URL, Args] -> {FullPath, split_path(URL), split_args(Args)}
+    end.
+
+split_path(<<"/", Path/binary>>) ->
+    binary:split(Path, [<<"/">>], [global, trim]);
+split_path(Path) ->
+    binary:split(Path, [<<"/">>], [global, trim]).
+
+
+%% @doc: Splits the url arguments into a proplist. Lifted from
+%% cowboy_http:x_www_form_urlencoded/2
+-spec split_args(binary()) -> list({binary(), binary() | true}).
+split_args(<<>>) ->
+	[];
+split_args(Qs) ->
+	Tokens = binary:split(Qs, <<"&">>, [global, trim]),
+	[case binary:split(Token, <<"=">>) of
+		[Token] -> {Token, true};
+		[Name, Value] -> {Name, Value}
+	end || Token <- Tokens].
+
+
+%%
+%% TIMING HELPERS
+%%
+
+%% @doc: Record the current time in the process dictionary. This
+%% allows easily adding time tracing wherever, without passing along
+%% any variables.
+t(Key) ->
+    put({time, Key}, os:timestamp()).
+
+get_timings() ->
+    lists:flatmap(fun ({{time, Key}, Val}) ->
+                          if
+                              Key =:= accepted -> ok;
+                              true -> erase({time, Key})
+                          end,
+                          [{Key, Val}];
+                     (_) ->
+                          []
+                 end, get()).
+
 
 
 

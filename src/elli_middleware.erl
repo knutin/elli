@@ -48,7 +48,7 @@ handle_event(elli_startup, Args, Config) ->
                                                   mods(Config))),
     forward_event(elli_startup, Args, mods(Config));
 handle_event(Event, Args, Config) ->
-    forward_event(Event, Args, mods(Config)).
+    forward_event(Event, Args, lists:reverse(mods(Config))).
 
 
 

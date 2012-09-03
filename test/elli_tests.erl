@@ -10,12 +10,13 @@ elli_test_() ->
       ?_test(hello_world()),
       ?_test(not_found()),
       ?_test(crash()),
-      %% ?_test(no_compress()),
+      ?_test(no_compress()),
       ?_test(exception_flow()),
       ?_test(user_connection()),
       ?_test(get_args()),
-      ?_test(shorthand())
-%%      ?_test(content_length())
+      ?_test(shorthand()),
+      ?_test(bad_request()),
+      ?_test(content_length())
      ]}.
 
 
@@ -58,13 +59,14 @@ crash() ->
     ?assertEqual("Internal server error", body(Response)).
 
 
-%% no_compress() ->
-%%     {ok, Response} = lhttpc:request("http://localhost:8080/compressed", "GET",
-%%                                     [{"Accept-Encoding", "gzip"}], 1000),
-%%     ?assertEqual({200, "OK"}, status(Response)),
-%%     ?assertEqual([{"Connection", "Keep-Alive"},
-%%                   {"Content-Length", "1032"}], headers(Response)),
-%%     ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response)).
+no_compress() ->
+    {ok, Response} = httpc:request(get, {"http://localhost:8080/compressed",
+                                         [{"Accept-Encoding", "gzip"}]}, [], []),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "1032"}], headers(Response)),
+    ?assertEqual(binary:copy(<<"Hello World!">>, 86),
+                 list_to_binary(body(Response))).
 
 exception_flow() ->
     {ok, Response} = httpc:request("http://localhost:8080/403"),
@@ -93,18 +95,29 @@ shorthand() ->
     ?assertEqual("hello", body(Response)).
 
 
+bad_request() ->
+    Headers = lists:duplicate(100, {"X-Foo", "Bar"}),
+    ?assertEqual({error, socket_closed_remotely},
+                 httpc:request(get, {"http://localhost:8080/foo", Headers},
+                               [], [])),
 
-%% content_length() ->
-%%     S = s(),
-%%     {ok, Response} = lhttpc:request("http://localhost:8080/304",
-%%                                     "GET", [], 1000),
+    Body = binary:copy(<<"x">>, 1024 * 11),
+    ?assertEqual({error, socket_closed_remotely},
+                 httpc:request(post,
+                               {"http://localhost:8080/foo", [], "foo", Body},
+                               [], [])).
 
-%%     ?assertEqual({304, "OK"}, status(Response)),
-%%     ?assertEqual([{"Connection", "Keep-Alive"},
-%%                   {"Content-Length", "0"}], headers(Response)),
-%%     ?assertEqual(<<>>, body(Response)),
 
-%%     stop(S).
+
+content_length() ->
+    {ok, Response} = httpc:request("http://localhost:8080/304"),
+
+    ?assertEqual(304, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "0"}], headers(Response)),
+    ?assertEqual([], body(Response)).
+
+
 
 
 body_qs_test() ->
@@ -120,7 +133,7 @@ to_proplist_test() ->
                headers = [{<<"Host">>,<<"localhost:8080">>}],
                body = <<>>,
                pid = self(),
-               peer = <<"127.0.0.1">>},
+               socket = socket},
 
     Prop = [{method,'GET'},
             {path,[<<"crash">>]},
@@ -130,7 +143,7 @@ to_proplist_test() ->
             {headers,[{<<"Host">>,<<"localhost:8080">>}]},
             {body,<<>>},
             {pid,self()},
-            {peer,<<"127.0.0.1">>}],
+            {socket,socket}],
     ?assertEqual(Prop, elli_request:to_proplist(Req)).
 
 
@@ -151,6 +164,12 @@ register_test() ->
     {ok, Pid} = elli:start_link([{name, {local, elli}}, {callback, elli_example_callback}]),
     ?assertEqual(Pid, whereis(elli)),
     ok.
+
+invalid_callback_test() ->
+    case catch elli:start_link([{callback, elli}]) of
+        E ->
+            ?assertEqual(invalid_callback, E)
+    end.
 
 
 %%
