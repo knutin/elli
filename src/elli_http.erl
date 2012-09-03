@@ -4,7 +4,7 @@
 %% connects. It then handles requests on that connection until it's
 %% closed either by the client timing out or explicitly by the user.
 -module(elli_http).
--include("elli.hrl").
+-include("../include/elli.hrl").
 
 -export([start_link/3, accept/3, handle_request/2, chunk_loop/3,
          split_args/1, parse_path/1]).

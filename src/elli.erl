@@ -5,7 +5,7 @@
 
 -module(elli).
 -behaviour(gen_server).
--include("elli.hrl").
+-include("../include/elli.hrl").
 
 %% API
 -export([start_link/0
