@@ -14,7 +14,8 @@ elli_test_() ->
       ?_test(exception_flow()),
       ?_test(user_connection()),
       ?_test(get_args()),
-      ?_test(shorthand())
+      ?_test(shorthand()),
+      ?_test(bad_request())
 %%      ?_test(content_length())
      ]}.
 
@@ -91,6 +92,19 @@ shorthand() ->
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "5"}], headers(Response)),
     ?assertEqual("hello", body(Response)).
+
+
+bad_request() ->
+    Headers = lists:duplicate(100, {"X-Foo", "Bar"}),
+    ?assertEqual({error, socket_closed_remotely},
+                 httpc:request(get, {"http://localhost:8080/foo", Headers},
+                               [], [])),
+
+    Body = binary:copy(<<"x">>, 1024 * 11),
+    ?assertEqual({error, socket_closed_remotely},
+                 httpc:request(post,
+                               {"http://localhost:8080/foo", [], "foo", Body},
+                               [], [])).
 
 
 

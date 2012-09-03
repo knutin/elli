@@ -81,12 +81,14 @@ handle_event(request_error, [Req, Error, Stack], _Config) ->
 
 handle_event(request_parse_error, [_Data], _Args) ->
     ok;
+handle_event(bad_request, _Data, _Args) ->
+    ok;
 
 handle_event(client_closed, [_When], _Config) ->
     ok;
-
 handle_event(client_timeout, [_When], _Config) ->
     ok;
+
 handle_event(elli_startup, [], Config) ->
     case whereis(proplists:get_value(name, Config)) of
         undefined ->

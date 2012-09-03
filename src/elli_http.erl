@@ -151,7 +151,9 @@ send_file(Socket, Code, Headers, Filename, {Mod, Args}) ->
             ok
     end.
 
-
+send_bad_request(Socket) ->
+    Response = [<<"HTTP/1.1 ">>, status(400), <<"\r\n">>],
+    gen_tcp:send(Socket, Response).
 
 %% @doc: Executes the user callback, translating failure into a proper
 %% response.
@@ -262,7 +264,7 @@ get_request(Socket, Buffer, {Mod, Args} = Callback) ->
                     {Method, RawPath, Version, Rest};
                 {ok, {http_error, _}, _} ->
                     Mod:handle_event(request_parse_error, [NewBuffer], Args),
-                    gen_tcp:send(Socket, status(400)),
+                    send_bad_request(Socket),
                     gen_tcp:close(Socket),
                     exit(normal);
                 {more, _} ->
@@ -285,6 +287,11 @@ get_headers(_Socket, {0, 9}, _, _) ->
 get_headers(Socket, {1, _}, Buffer, Callback) ->
     get_headers(Socket, Buffer, [], 0, Callback).
 
+get_headers(Socket, _, Headers, HeadersCount, {Mod, Args}) when HeadersCount >= 100 ->
+    Mod:handle_event(bad_request, [{too_many_headers, Headers}], Args),
+    send_bad_request(Socket),
+    gen_tcp:close(Socket),
+    exit(normal);
 get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
     case erlang:decode_packet(httph_bin, Buffer, []) of
         {ok, {http_header, _, Key, _, Value}, Rest} ->
@@ -315,24 +322,30 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
             <<>>;
         ContentLengthBin ->
             ContentLength = ?b2i(ContentLengthBin),
-            BufSize = byte_size(Buffer),
 
-            case ContentLength - BufSize of
-                0 ->
-                    Buffer;
-                N ->
-                    case gen_tcp:recv(Socket, N, 30000) of
-                        {ok, Data} ->
-                            <<Buffer/binary, Data/binary>>;
-                        {error, closed} ->
-                            Mod:handle_event(client_closed, [receiving_body], Args),
-                            ok = gen_tcp:close(Socket),
-                            exit(normal);
-                        {error, timeout} ->
-                            Mod:handle_event(client_timeout, [receiving_body], Args),
-                            ok = gen_tcp:close(Socket),
-                            exit(normal)
-                    end
+            case ContentLength < 10240 of
+                true ->
+                    case ContentLength - byte_size(Buffer) of
+                        0 ->
+                            Buffer;
+                        N ->
+                            case gen_tcp:recv(Socket, N, 30000) of
+                                {ok, Data} ->
+                                    <<Buffer/binary, Data/binary>>;
+                                {error, closed} ->
+                                    Mod:handle_event(client_closed, [receiving_body], Args),
+                                    ok = gen_tcp:close(Socket),
+                                    exit(normal);
+                                {error, timeout} ->
+                                    Mod:handle_event(client_timeout, [receiving_body], Args),
+                                    ok = gen_tcp:close(Socket),
+                                    exit(normal)
+                            end
+                    end;
+                false ->
+                    Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),
+                    gen_tcp:close(Socket),
+                    exit(normal)
             end
     end.
 
