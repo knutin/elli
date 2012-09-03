@@ -10,13 +10,13 @@ elli_test_() ->
       ?_test(hello_world()),
       ?_test(not_found()),
       ?_test(crash()),
-      %% ?_test(no_compress()),
+      ?_test(no_compress()),
       ?_test(exception_flow()),
       ?_test(user_connection()),
       ?_test(get_args()),
       ?_test(shorthand()),
-      ?_test(bad_request())
-%%      ?_test(content_length())
+      ?_test(bad_request()),
+      ?_test(content_length())
      ]}.
 
 
@@ -59,13 +59,14 @@ crash() ->
     ?assertEqual("Internal server error", body(Response)).
 
 
-%% no_compress() ->
-%%     {ok, Response} = lhttpc:request("http://localhost:8080/compressed", "GET",
-%%                                     [{"Accept-Encoding", "gzip"}], 1000),
-%%     ?assertEqual({200, "OK"}, status(Response)),
-%%     ?assertEqual([{"Connection", "Keep-Alive"},
-%%                   {"Content-Length", "1032"}], headers(Response)),
-%%     ?assertEqual(binary:copy(<<"Hello World!">>, 86), body(Response)).
+no_compress() ->
+    {ok, Response} = httpc:request(get, {"http://localhost:8080/compressed",
+                                         [{"Accept-Encoding", "gzip"}]}, [], []),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "1032"}], headers(Response)),
+    ?assertEqual(binary:copy(<<"Hello World!">>, 86),
+                 list_to_binary(body(Response))).
 
 exception_flow() ->
     {ok, Response} = httpc:request("http://localhost:8080/403"),
@@ -108,17 +109,15 @@ bad_request() ->
 
 
 
-%% content_length() ->
-%%     S = s(),
-%%     {ok, Response} = lhttpc:request("http://localhost:8080/304",
-%%                                     "GET", [], 1000),
+content_length() ->
+    {ok, Response} = httpc:request("http://localhost:8080/304"),
 
-%%     ?assertEqual({304, "OK"}, status(Response)),
-%%     ?assertEqual([{"Connection", "Keep-Alive"},
-%%                   {"Content-Length", "0"}], headers(Response)),
-%%     ?assertEqual(<<>>, body(Response)),
+    ?assertEqual(304, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "0"}], headers(Response)),
+    ?assertEqual([], body(Response)).
 
-%%     stop(S).
+
 
 
 body_qs_test() ->
