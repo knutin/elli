@@ -49,8 +49,8 @@ released. For this reason I include an ApacheBench script
 
 ## Installation
 
-Add elli to you application by adding it as a dependency to you rebar
-config.
+Add elli to your application by adding it as a dependency to your
+rebar config.
 
 ```erlang
 % rebar.config:
