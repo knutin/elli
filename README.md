@@ -70,7 +70,7 @@ $: ./rebar compile
 
 ## Usage
 ```
-$: erl -pa ebin
+$: erl -pa deps/*/ebin ebin
 
 % starting elli
 1>: {ok, Pid} = elli:start_link([{callback, elli_example_callback}, {port, 3000}]).
