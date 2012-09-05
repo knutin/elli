@@ -1,4 +1,4 @@
-%% @doc HTTP access and error long, sending to syslog over UDP
+%% @doc HTTP access and error log, sending to syslog over UDP
 %%
 %% Sends a simple log line for every request, even errors, to
 %% syslog. The line includes the following timings, all specified in
@@ -6,24 +6,24 @@
 %%
 %% RequestLine/Headers/Body/User/Response/Total
 %%
-%%  * RequestLine: time between accept returning and complete receive
-%%  of the request line, ie. "GET /foo HTTP/1.1". If keep-alive is
-%%  used, this will be the time since the initial accept so it might
-%%  be very high.
+%% * RequestLine: time between accept returning and complete receive
+%%   of the request line, ie. "GET /foo HTTP/1.1". If keep-alive is
+%%   used, this will be the time since the initial accept so it might
+%%   be very high.
 %%
 %% * Headers: Time to receive all headers
 %%
 %% * Body: Time to receive the entire body into memory, not including
-%% any decoding
+%%   any decoding
 %%
 %% * User: Time spent in the callback. If middleware is used, the
-%% runtime of the middleware is included in this number
+%%   runtime of the middleware is included in this number
 %%
 %% * Response: Time taken to send the response to the client
 %%
 %% * Total: The time between the request line was received and the
-%% response was sent. This is as close we can get to the actual time
-%% of the request as seen by the server.
+%%   response was sent. This is as close we can get to the actual time
+%%   of the request as seen by the user.
 
 -module(elli_access_log).
 -behaviour(elli_handler).
@@ -31,11 +31,15 @@
 
 
 handle(_Req, _Args) ->
+    %% We are installed as a middleware, ignore everything.
     ignore.
 
 
 handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
                                 ResponseBody, Timings], Config) ->
+
+    %% The Elli request process is done handling the request, so we
+    %% can afford to do some heavy lifting here.
 
     Accepted     = proplists:get_value(accepted, Timings),
     RequestStart = proplists:get_value(request_start, Timings),
@@ -62,7 +66,7 @@ handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
                          elli_request:raw_path(Req)
                         ]),
 
-    log(Msg, Config),
+    elli_access_log_server:log(name(Config), Msg),
     ok;
 
 handle_event(request_throw, [Req, Exception, Stack], _Config) ->
@@ -90,22 +94,18 @@ handle_event(client_timeout, [_When], _Config) ->
     ok;
 
 handle_event(elli_startup, [], Config) ->
-    case whereis(proplists:get_value(name, Config)) of
+    {ok, _} = elli_access_log_server:start_link(name(Config), facility(Config)),
+
+    case whereis(name(Config)) of
         undefined ->
-            {ok, _Pid} = syslog:start_link(proplists:get_value(name, Config),
-                                          proplists:get_value(ip, Config),
-                                          proplists:get_value(port, Config)),
+            {ok, _Pid} = syslog:start_link(name(Config),
+                                           proplists:get_value(ip, Config),
+                                           proplists:get_value(port, Config)),
             ok;
         Pid when is_pid(Pid) ->
             ok
     end.
 
 
-
-
-
-log(Msg, Config) ->
-    syslog:send(proplists:get_value(name, Config), Msg,
-                [{ident, node()},
-                 {facility, proplists:get_value(facility, Config, local0)}
-                ]).
+name(Config) -> proplists:get_value(name, Config).
+facility(Config) -> proplists:get_value(facility, Config, local0).
