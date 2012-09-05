@@ -23,8 +23,8 @@
 
 
 -record(state, {socket,
-                acceptors = 0,
-                open_reqs = 0,
+                acceptors,
+                open_reqs,
                 callback :: callback()
 }).
 

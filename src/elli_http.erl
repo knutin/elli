@@ -18,7 +18,9 @@ start_link(Server, ListenSocket, Callback) ->
 
 -spec accept(pid(), port(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
-%% request, then loops if we're using keep alive or chunked transfer.
+%% request, then loops if we're using keep alive or chunked
+%% transfer. If accept doesn't give us a socket within 1 second, we
+%% loop to allow code upgrades.
 accept(Server, ListenSocket, Callback) ->
     case catch gen_tcp:accept(ListenSocket, 1000) of
         {ok, Socket} ->

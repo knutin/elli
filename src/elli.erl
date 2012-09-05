@@ -1,8 +1,10 @@
-%% @doc: Elli manager
+%% @doc: Elli acceptor manager
 %%
-%% This is a gen_server that manages the processes accepting
-%% connections on the socket.
-
+%% This gen_server owns the listen socket and manages the processes
+%% accepting on that socket. When a process waiting for accept gets a
+%% request, it notifies this gen_server so we can start up another
+%% acceptor.
+%%
 -module(elli).
 -behaviour(gen_server).
 -include("elli.hrl").
@@ -58,7 +60,11 @@ stop(S) ->
 %%%===================================================================
 
 init([Opts]) ->
+    %% Use the exit signal from the acceptor processes to know when
+    %% they exit
     process_flag(trap_exit, true),
+
+
     Callback = required_opt(callback, Opts),
     CallbackArgs = proplists:get_value(callback_args, Opts),
     IPAddress = proplists:get_value(ip, Opts, {0,0,0,0}),
@@ -82,6 +88,7 @@ init([Opts]) ->
 
     {ok, #state{socket = Socket,
                 acceptors = Acceptors,
+                open_reqs = 0,
                 callback = {Callback, CallbackArgs}}}.
 
 
@@ -104,11 +111,7 @@ handle_cast(_Msg, State) ->
 
 handle_info({'EXIT', Pid, _Reason}, #state{acceptors = Acceptors} = State) ->
     {noreply, State#state{acceptors = lists:delete(Pid, Acceptors),
-                          open_reqs = State#state.open_reqs - 1}};
-
-handle_info(_Info, State) ->
-    io:format("elli got ~p~n", [_Info]),
-    {noreply, State}.
+                          open_reqs = State#state.open_reqs - 1}}.
 
 terminate(_Reason, _State) ->
     ok.
