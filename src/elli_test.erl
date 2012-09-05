@@ -14,6 +14,7 @@ call(Method, RawPath, RequestHeaders, RequestBody, Opts) ->
     CallbackArgs = proplists:get_value(callback_args, Opts),
     Req = elli_http:mk_req(Method, {abs_path, RawPath}, RequestHeaders,
 			   RequestBody, {1,1}, undefined),
+    ok = Callback:handle_event(elli_startup, [], CallbackArgs),
     Callback:handle(Req, CallbackArgs).
     
 -ifdef(TEST).
