@@ -25,8 +25,7 @@
 %%% API
 %%%===================================================================
 
-start_link() -> start_link([{callback, elli_example_callback},
-                            {callback_args, []}]).
+start_link() -> start_link(?example_conf).
 
 start_link(Opts) ->
     %% Validate options
