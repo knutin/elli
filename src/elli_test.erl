@@ -9,11 +9,11 @@
 
 -export([call/5]).
 
-call(Method, RawPath, RequestHeaders, RequestBody, Opts) ->
+call(Method, Path, Headers, Body, Opts) ->
     Callback = proplists:get_value(callback, Opts),
     CallbackArgs = proplists:get_value(callback_args, Opts),
-    Req = elli_http:mk_req(Method, {abs_path, RawPath}, RequestHeaders,
-			   RequestBody, {1,1}, undefined),
+    Req = elli_http:mk_req(Method, {abs_path, Path}, Headers,
+			   Body, {1,1}, undefined),
     ok = Callback:handle_event(elli_startup, [], CallbackArgs),
     Callback:handle(Req, CallbackArgs).
     
@@ -23,6 +23,6 @@ call(Method, RawPath, RequestHeaders, RequestBody, Opts) ->
 hello_world_test() ->
     ?assertEqual({ok, [], <<"Hello World!">>},
 		 elli_test:call('GET', <<"/hello/world/">>, [], <<>>,
-		      ?example_conf)).
+				?example_conf)).
 
 -endif. %% TEST
