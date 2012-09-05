@@ -37,7 +37,7 @@ webserver, but more of a specialized tool, we believe it has a very
 different target audience and would not attract effort or users away
 from the big names.
 
-## Why write another webserver? Isn't this just the NIH syndrome?
+## Why another webserver? Isn't this just the NIH syndrome?
 
 Yaws, Mochiweb, Misultin and Cowboy are great projects, hardened over
 time and full of very useful features for web development. If you
@@ -52,6 +52,17 @@ communities, we could create a core that was better for our use cases.
 It started out as an experiment to see if it is at all possible to
 significantly improve and it turns out that for our particular use
 cases, there is enough improvement to warrant a new project.
+
+## What makes Elli different?
+
+Elli has a very simple architecture. It avoids using more processes
+and messages than absolutely necessary. It uses binaries for
+strings. The request-response programming model allows middlewares to
+do much heavy lifting, so the core can stay very simple. It has been
+instrumented so as a user you can understand where time is spent. When
+things go wrong, like the client closed the connection before you
+could send a response, you are notified about these things so you can
+better understand your client behaviour.
 
 ## Performance
 
