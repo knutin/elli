@@ -22,7 +22,7 @@ call(Method, RawPath, RequestHeaders, RequestBody, Opts) ->
 
 hello_world_test() ->
     ?assertEqual({ok, [], <<"Hello World!">>},
-		 call('GET', <<"/hello/world/">>, [], <<>>,
+		 elli_test:call('GET', <<"/hello/world/">>, [], <<>>,
 		      ?example_conf)).
 
 -endif. %% TEST
