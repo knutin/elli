@@ -1,6 +1,7 @@
 %%% @author Andreas Hasselberg <andreas.hasselberg@gmail.com>
 %%% @doc
-%%%
+%%%  Helpers for creating unit tests for elli callbacks.
+%%%  The unit tests below tests elli_example_callback.
 %%% @end
 
 -module(elli_test).
@@ -9,6 +10,9 @@
 
 -export([call/5]).
 
+-spec call(Method::http_method(), Path::binary(),
+	   Headers::headers(), Body::body(), Opts::proplist:proplist()) ->
+		  record(req).
 call(Method, Path, Headers, Body, Opts) ->
     Callback = proplists:get_value(callback, Opts),
     CallbackArgs = proplists:get_value(callback_args, Opts),
