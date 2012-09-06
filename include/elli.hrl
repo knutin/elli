@@ -41,4 +41,4 @@
 }).
 
 -define(example_conf, [{callback, elli_example_callback},
-		       {callback_args, []}]).
+                       {callback_args, []}]).
