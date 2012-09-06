@@ -36,7 +36,7 @@ handle(_Req, _Args) ->
 
 
 handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
-                                ResponseBody, Timings], Config) ->
+                                ResponseBody, Timings], Args) ->
 
     %% The Elli request process is done handling the request, so we
     %% can afford to do some heavy lifting here.
@@ -66,19 +66,19 @@ handle_event(request_complete, [Req, ResponseCode, _ResponseHeaders,
                          elli_request:raw_path(Req)
                         ]),
 
-    elli_access_log_server:log(name(Config), Msg),
+    elli_access_log_server:log(name(Args), Msg),
     ok;
 
-handle_event(request_throw, [Req, Exception, Stack], _Config) ->
+handle_event(request_throw, [Req, Exception, Stack], _Args) ->
     error_logger:error_msg("exception: ~p~nstack: ~p~nrequest: ~p~n",
                            [Exception, Stack, elli_request:to_proplist(Req)]),
     ok;
-handle_event(request_exit, [Req, Exit, Stack], _Config) ->
+handle_event(request_exit, [Req, Exit, Stack], _Args) ->
     error_logger:error_msg("exit: ~p~nstack: ~p~nrequest: ~p~n",
                            [Exit, Stack, elli_request:to_proplist(Req)]),
     ok;
 
-handle_event(request_error, [Req, Error, Stack], _Config) ->
+handle_event(request_error, [Req, Error, Stack], _Args) ->
     error_logger:error_msg("error: ~p~nstack: ~p~nrequest: ~p~n",
                            [Error, Stack, elli_request:to_proplist(Req)]),
     ok;
@@ -88,19 +88,19 @@ handle_event(request_parse_error, [_Data], _Args) ->
 handle_event(bad_request, _Data, _Args) ->
     ok;
 
-handle_event(client_closed, [_When], _Config) ->
+handle_event(client_closed, [_When], _Args) ->
     ok;
-handle_event(client_timeout, [_When], _Config) ->
+handle_event(client_timeout, [_When], _Args) ->
     ok;
 
-handle_event(elli_startup, [], Config) ->
-    {ok, _} = elli_access_log_server:start_link(name(Config), facility(Config)),
+handle_event(elli_startup, [], Args) ->
+    {ok, _} = elli_access_log_server:start_link(name(Args), facility(Args)),
 
-    case whereis(name(Config)) of
+    case whereis(name(Args)) of
         undefined ->
-            {ok, _Pid} = syslog:start_link(name(Config),
-                                           proplists:get_value(ip, Config),
-                                           proplists:get_value(port, Config)),
+            {ok, _Pid} = syslog:start_link(name(Args),
+                                           proplists:get_value(ip, Args),
+                                           proplists:get_value(port, Args)),
             ok;
         Pid when is_pid(Pid) ->
             ok
@@ -109,3 +109,4 @@ handle_event(elli_startup, [], Config) ->
 
 name(Config) -> proplists:get_value(name, Config).
 facility(Config) -> proplists:get_value(facility, Config, local0).
+

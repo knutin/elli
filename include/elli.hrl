@@ -39,3 +39,6 @@
           pid :: pid(),
           socket :: inet:socket()
 }).
+
+-define(example_conf, [{callback, elli_example_callback},
+		       {callback_args, []}]).

@@ -7,7 +7,7 @@
 %%
 -module(elli).
 -behaviour(gen_server).
--include("elli.hrl").
+-include("../include/elli.hrl").
 
 %% API
 -export([start_link/0
@@ -27,8 +27,7 @@
 %%% API
 %%%===================================================================
 
-start_link() -> start_link([{callback, elli_example_callback},
-                            {callback_args, []}]).
+start_link() -> start_link(?example_conf).
 
 start_link(Opts) ->
     %% Validate options
