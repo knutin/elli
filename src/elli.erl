@@ -27,7 +27,7 @@
 %%% API
 %%%===================================================================
 
-start_link() -> start_link(?example_conf).
+start_link() -> start_link(?EXAMPLE_CONF).
 
 start_link(Opts) ->
     %% Validate options
