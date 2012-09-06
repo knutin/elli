@@ -1,5 +1,5 @@
 -module(elli_request).
--include("elli.hrl").
+-include("../include/elli.hrl").
 
 -export([send_chunk/2
          , async_send_chunk/2
@@ -92,7 +92,7 @@ to_proplist(#req{} = Req) ->
 %% not_supported}.
 chunk_ref(#req{version = {1, 1}} = Req) ->
     Req#req.pid;
-chunk_ref(_) ->
+chunk_ref(#req{}) ->
     {error, not_supported}.
 
 async_send_chunk(Ref, Data) ->
