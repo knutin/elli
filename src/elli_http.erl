@@ -44,7 +44,16 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket),
+    Req = case mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket) of
+              {ok, R} ->
+                  R;
+
+              {error, Reason} ->
+                  Mod:handle_event(request_parse_error, [{Method, RawPath}], Reason),
+                  send_bad_request(Socket),
+                  gen_tcp:close(Socket),
+                  exit(normal)
+          end,
 
     t(user_start),
     case execute_callback(Req, Callback) of
@@ -112,12 +121,16 @@ handle_request(Socket, {Mod, Args} = Callback) ->
 
 -spec mk_req(Method::http_method(), RawPath::binary(),
              RequestHeaders::headers(), RequestBody::body(), V::version(),
-             Socket::inet:socket()) -> record(req).
+             Socket::inet:socket()) -> {ok, record(req)} | {error, atom()}.
 mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket) ->
-    {Path, URL, URLArgs} = parse_path(RawPath),
-    #req{method = Method, path = URL, args = URLArgs, version = V,
-         raw_path = Path, headers = RequestHeaders, body = RequestBody,
-         pid = self(), socket = Socket}.
+    case parse_path(RawPath) of
+        {ok, {Path, URL, URLArgs}} ->
+            {ok, #req{method = Method, path = URL, args = URLArgs, version = V,
+                      raw_path = Path, headers = RequestHeaders,
+                      body = RequestBody, pid = self(), socket = Socket}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 
 %% @doc: Generates a HTTP response and sends it to the client
@@ -418,9 +431,13 @@ content_length(Body)->
 
 parse_path({abs_path, FullPath}) ->
     case binary:split(FullPath, [<<"?">>]) of
-        [URL]       -> {FullPath, split_path(URL), []};
-        [URL, Args] -> {FullPath, split_path(URL), split_args(Args)}
-    end.
+        [URL]       -> {ok, {FullPath, split_path(URL), []}};
+        [URL, Args] -> {ok, {FullPath, split_path(URL), split_args(Args)}}
+    end;
+parse_path({absoluteURI, _Scheme, _Host, _Port, Path}) ->
+    parse_path({abs_path, Path});
+parse_path(_) ->
+    {error, unsupported_uri}.
 
 split_path(<<"/", Path/binary>>) ->
     binary:split(Path, [<<"/">>], [global, trim]);
