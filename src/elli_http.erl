@@ -9,7 +9,7 @@
 -export([start_link/3, accept/3, handle_request/2, chunk_loop/3,
          split_args/1, parse_path/1]).
 
--export([mk_req/6]). %% useful when testing.
+-export([mk_req/7]). %% useful when testing.
 
 
 -spec start_link(pid(), port(), callback()) -> pid().
@@ -44,16 +44,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    Req = case mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket) of
-              {ok, R} ->
-                  R;
-
-              {error, Reason} ->
-                  Mod:handle_event(request_parse_error, [{Method, RawPath}], Reason),
-                  send_bad_request(Socket),
-                  gen_tcp:close(Socket),
-                  exit(normal)
-          end,
+    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback),
 
     t(user_start),
     case execute_callback(Req, Callback) of
@@ -119,17 +110,22 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             end
     end.
 
--spec mk_req(Method::http_method(), RawPath::binary(),
-             RequestHeaders::headers(), RequestBody::body(), V::version(),
-             Socket::inet:socket()) -> {ok, record(req)} | {error, atom()}.
-mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket) ->
+-spec mk_req(Method::http_method(), RawPath::binary(), RequestHeaders::headers(),
+             RequestBody::body(), V::version(), Socket::inet:socket(),
+             Callback::callback()) -> record(req).
+mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
+    {Mod, Args} = Callback,
     case parse_path(RawPath) of
         {ok, {Path, URL, URLArgs}} ->
-            {ok, #req{method = Method, path = URL, args = URLArgs, version = V,
-                      raw_path = Path, headers = RequestHeaders,
-                      body = RequestBody, pid = self(), socket = Socket}};
+            #req{method = Method, path = URL, args = URLArgs, version = V,
+                 raw_path = Path, headers = RequestHeaders,
+                 body = RequestBody, pid = self(), socket = Socket};
         {error, Reason} ->
-            {error, Reason}
+            Mod:handle_event(request_parse_error,
+                    [{Reason, {Method, RawPath}}], Args),
+            send_bad_request(Socket),
+            gen_tcp:close(Socket),
+            exit(normal)
     end.
 
 
