@@ -334,7 +334,7 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
         ContentLengthBin ->
             ContentLength = ?b2i(ContentLengthBin),
 
-            case ContentLength < 10240 of
+            case ContentLength < 102400 of
                 true ->
                     case ContentLength - byte_size(Buffer) of
                         0 ->
