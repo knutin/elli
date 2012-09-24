@@ -95,11 +95,17 @@ chunk_ref(#req{version = {1, 1}} = Req) ->
 chunk_ref(#req{}) ->
     {error, not_supported}.
 
+%% @doc: Sends a chunk asynchronously
 async_send_chunk(Ref, Data) ->
     Ref ! {chunk, Data}.
 
+%% @doc: Sends a chunk synchronously, if the refrenced process is dead
+%% returns early with {error, noproc} instead of timing out.
 send_chunk(Ref, Data) ->
-    send_chunk(Ref, Data, 5000).
+    case is_process_alive(Ref) of
+        false -> {error, noproc};
+        true  -> send_chunk(Ref, Data, 5000)
+    end.
 
 send_chunk(Ref, Data, Timeout) ->
     Ref ! {chunk, Data, self()},

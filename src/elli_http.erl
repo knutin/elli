@@ -6,7 +6,7 @@
 -module(elli_http).
 -include("../include/elli.hrl").
 
--export([start_link/3, accept/3, handle_request/2, chunk_loop/3,
+-export([start_link/3, accept/3, handle_request/2, chunk_loop/2,
          split_args/1, parse_path/1]).
 
 -export([mk_req/7]). %% useful when testing.
@@ -80,7 +80,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             send_response(Socket, 200, ResponseHeaders, <<"">>, Callback),
             Initial =:= <<"">> orelse send_chunk(Socket, Initial),
 
-            chunk_loop(Socket, Req),
+            start_chunk_loop(Socket, Req),
 
             t(request_end),
             Mod:handle_event(request_complete,
@@ -199,19 +199,17 @@ execute_callback(Req, {Mod, Args}) ->
 
 
 %% @doc: The chunk loop is an intermediary between the socket and the
-%% user. We forward anythingthe user sends until the user sends an
+%% user. We forward anything the user sends until the user sends an
 %% empty response, which signals that the connection should be
-%% closed. When the client closes the socket, the loop sticks around
-%% until the user tries to send something again so we can notify about
-%% the closed socket.
-chunk_loop(Socket, Req) ->
+%% closed. When the client closes the socket, the loop exits.
+start_chunk_loop(Socket, Req) ->
     inet:setopts(Socket, [{active, once}]),
-    ?MODULE:chunk_loop(Socket, Req, open).
+    ?MODULE:chunk_loop(Socket, Req).
 
-chunk_loop(Socket, Req, open) ->
+chunk_loop(Socket, Req) ->
     receive
         {tcp_closed, Socket} ->
-            ?MODULE:chunk_loop(Socket, Req, closed);
+           ok;
 
         {chunk, <<>>} ->
             gen_tcp:send(Socket, <<"0\r\n\r\n">>),
@@ -230,7 +228,7 @@ chunk_loop(Socket, Req, open) ->
 
         {chunk, Data} ->
             send_chunk(Socket, Data),
-            ?MODULE:chunk_loop(Socket, Req, open);
+            ?MODULE:chunk_loop(Socket, Req);
         {chunk, Data, From} ->
             case send_chunk(Socket, Data) of
                 ok ->
@@ -238,17 +236,9 @@ chunk_loop(Socket, Req, open) ->
                 {error, closed} ->
                     From ! {self(), {error, closed}}
             end,
-            ?MODULE:chunk_loop(Socket, Req, open)
+            ?MODULE:chunk_loop(Socket, Req)
     after 10000 ->
-            ?MODULE:chunk_loop(Socket, Req, open)
-    end;
-
-chunk_loop(Socket, Req, closed) ->
-    receive
-        {chunk, _, From} ->
-            From ! {self(), {error, closed}}
-    after 10000 ->
-            ?MODULE:chunk_loop(Socket, Req, closed)
+            ?MODULE:chunk_loop(Socket, Req)
     end.
 
 
