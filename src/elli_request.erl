@@ -102,7 +102,7 @@ async_send_chunk(Ref, Data) ->
 %% @doc: Sends a chunk synchronously, if the refrenced process is dead
 %% returns early with {error, closed} instead of timing out.
 send_chunk(Ref, Data) ->
-    case rpc:call(node(Ref), erlang, is_process_alive, [Ref]) of
+    case is_ref_alive(Ref) of
         false -> {error, closed};
         true  -> send_chunk(Ref, Data, 5000)
     end.
@@ -116,4 +116,10 @@ send_chunk(Ref, Data, Timeout) ->
             {error, Reason}
     after Timeout ->
             {error, timeout}
+    end.
+
+is_ref_alive(Ref) ->
+    case node(Ref) =:= node(self()) of
+        true -> is_process_alive(Ref);
+        false -> rpc:call(node(Ref), erlang, is_process_alive, [Ref])
     end.
