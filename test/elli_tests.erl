@@ -101,7 +101,7 @@ bad_request() ->
                  httpc:request(get, {"http://localhost:8080/foo", Headers},
                                [], [])),
 
-    Body = binary:copy(<<"x">>, 1024 * 11),
+    Body = binary:copy(<<"x">>, 1024 * 1000),
     ?assertEqual({error, socket_closed_remotely},
                  httpc:request(post,
                                {"http://localhost:8080/foo", [], "foo", Body},
