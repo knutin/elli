@@ -80,7 +80,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             send_response(Socket, 200, ResponseHeaders, <<"">>, Callback),
             Initial =:= <<"">> orelse send_chunk(Socket, Initial),
 
-            start_chunk_loop(Socket, Req),
+            start_chunk_loop(Socket, Callback),
 
             t(request_end),
             Mod:handle_event(request_complete,
@@ -202,14 +202,15 @@ execute_callback(Req, {Mod, Args}) ->
 %% user. We forward anything the user sends until the user sends an
 %% empty response, which signals that the connection should be
 %% closed. When the client closes the socket, the loop exits.
-start_chunk_loop(Socket, Req) ->
+start_chunk_loop(Socket, Callback) ->
     inet:setopts(Socket, [{active, once}]),
-    ?MODULE:chunk_loop(Socket, Req).
+    ?MODULE:chunk_loop(Socket, Callback).
 
-chunk_loop(Socket, Req) ->
+chunk_loop(Socket, {Mod, Args} = Callback) ->
     receive
         {tcp_closed, Socket} ->
-           ok;
+            Mod:handle_event(client_closed, [during_response], Args),
+            exit(normal);
 
         {chunk, <<>>} ->
             gen_tcp:send(Socket, <<"0\r\n\r\n">>),
@@ -228,7 +229,7 @@ chunk_loop(Socket, Req) ->
 
         {chunk, Data} ->
             send_chunk(Socket, Data),
-            ?MODULE:chunk_loop(Socket, Req);
+            ?MODULE:chunk_loop(Socket, Callback);
         {chunk, Data, From} ->
             case send_chunk(Socket, Data) of
                 ok ->
@@ -236,9 +237,9 @@ chunk_loop(Socket, Req) ->
                 {error, closed} ->
                     From ! {self(), {error, closed}}
             end,
-            ?MODULE:chunk_loop(Socket, Req)
+            ?MODULE:chunk_loop(Socket, Callback)
     after 10000 ->
-            ?MODULE:chunk_loop(Socket, Req)
+            ?MODULE:chunk_loop(Socket, Callback)
     end.
 
 
