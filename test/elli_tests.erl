@@ -33,7 +33,9 @@ setup() ->
     [P].
 
 teardown(Pids) ->
-    [elli:stop(P) || P <- Pids].
+    [elli:stop(P) || P <- Pids],
+    error_logger:info_msg("Pids: ~p, alive: ~p~n", [Pids, is_process_alive(hd(Pids))]),
+    ok.
 
 hello_world() ->
     URL = "http://localhost:3001/hello/world",
