@@ -13,6 +13,7 @@
 -include("../include/elli.hrl").
 -behaviour(elli_handler).
 
+-include_lib("kernel/include/file.hrl").
 
 %%
 %% ELLI REQUEST CALLBACK
@@ -67,6 +68,17 @@ handle('GET', [<<"crash">>], _Req) ->
     %% Throwing an exception results in a 500 response and
     %% request_throw being called
     throw(foobar);
+
+handle('GET', [<<"sendfile">>], _Req) ->
+    %% Returning {file, "/path/to/file"} instead of the body results
+    %% in Elli using sendfile. In the name of performance, Elli
+    %% requires you to specify the Content-Length header, since you
+    %% probably already stated the file to check if it exists.
+
+    F = "../src/elli_example_callback.erl",
+    {ok, #file_info{size = Size}} = file:read_file_info(F),
+
+    {200, [{<<"Content-Length">>, Size}], {file, F}};
 
 handle('GET', [<<"compressed">>], _Req) ->
     %% Body with a byte size over 1024 are automatically gzipped by
