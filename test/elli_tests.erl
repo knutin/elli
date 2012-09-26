@@ -4,7 +4,7 @@
 
 
 elli_test_() ->
-    {setup,
+    {foreach,
      fun setup/0, fun teardown/1,
      [
       ?_test(hello_world()),
@@ -33,9 +33,7 @@ setup() ->
     [P].
 
 teardown(Pids) ->
-    [elli:stop(P) || P <- Pids],
-    error_logger:info_msg("Pids: ~p, alive: ~p~n", [Pids, is_process_alive(hd(Pids))]),
-    ok.
+    [elli:stop(P) || P <- Pids].
 
 hello_world() ->
     URL = "http://localhost:3001/hello/world",
