@@ -4,7 +4,7 @@
 
 
 elli_test_() ->
-    {foreach,
+    {setup,
      fun setup/0, fun teardown/1,
      [
       ?_test(hello_world()),
@@ -29,7 +29,6 @@ setup() ->
     inets:start(),
     {ok, P} = elli:start_link([{callback, elli_example_callback}, {port, 3001}]),
     unlink(P),
-    register(elli, P),
     [P].
 
 teardown(Pids) ->
