@@ -95,11 +95,17 @@ chunk_ref(#req{version = {1, 1}} = Req) ->
 chunk_ref(#req{}) ->
     {error, not_supported}.
 
+%% @doc: Sends a chunk asynchronously
 async_send_chunk(Ref, Data) ->
     Ref ! {chunk, Data}.
 
+%% @doc: Sends a chunk synchronously, if the refrenced process is dead
+%% returns early with {error, closed} instead of timing out.
 send_chunk(Ref, Data) ->
-    send_chunk(Ref, Data, 5000).
+    case is_ref_alive(Ref) of
+        false -> {error, closed};
+        true  -> send_chunk(Ref, Data, 5000)
+    end.
 
 send_chunk(Ref, Data, Timeout) ->
     Ref ! {chunk, Data, self()},
@@ -110,4 +116,10 @@ send_chunk(Ref, Data, Timeout) ->
             {error, Reason}
     after Timeout ->
             {error, timeout}
+    end.
+
+is_ref_alive(Ref) ->
+    case node(Ref) =:= node(self()) of
+        true -> is_process_alive(Ref);
+        false -> rpc:call(node(Ref), erlang, is_process_alive, [Ref])
     end.
