@@ -16,7 +16,8 @@ elli_test_() ->
       ?_test(get_args()),
       ?_test(shorthand()),
       ?_test(bad_request()),
-      ?_test(content_length())
+      ?_test(content_length()),
+      ?_test(chunked())
      ]}.
 
 
@@ -117,6 +118,18 @@ content_length() ->
                   {"content-length", "0"}], headers(Response)),
     ?assertEqual([], body(Response)).
 
+
+chunked() ->
+    Expected = "chunk10chunk9chunk8chunk7chunk6chunk5chunk4chunk3chunk2chunk1",
+
+    {ok, Response} = httpc:request("http://localhost:8080/chunked"),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  %% httpc adds a content-length, even though elli
+                  %% does not send any for chunked trasnfers
+                  {"content-length", integer_to_list(length(Expected))},
+                  {"content-type", "text/event-stream"}], headers(Response)),
+    ?assertEqual(Expected, body(Response)).
 
 
 

@@ -114,7 +114,7 @@ chunk_loop(Ref, 0) ->
     %% Send empty chunk to make elli close the connection
     elli_request:send_chunk(Ref, <<>>);
 chunk_loop(Ref, N) ->
-    timer:sleep(1000),
+    timer:sleep(10),
 
     %% Send a chunk to the client, check for errors as the user might
     %% have disconnected
