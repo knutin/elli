@@ -27,7 +27,7 @@ setup() ->
     application:start(public_key),
     application:start(ssl),
     inets:start(),
-    {ok, P} = elli:start_link([{callback, elli_example_callback}]),
+    {ok, P} = elli:start_link([{callback, elli_example_callback}, {port, 3001}]),
     unlink(P),
     register(elli, P),
     [P].
@@ -36,7 +36,7 @@ teardown(Pids) ->
     [elli:stop(P) || P <- Pids].
 
 hello_world() ->
-    URL = "http://localhost:8080/hello/world",
+    URL = "http://localhost:3001/hello/world",
     {ok, Response} = httpc:request(URL),
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
@@ -46,14 +46,14 @@ hello_world() ->
 
 
 not_found() ->
-    {ok, Response} = httpc:request("http://localhost:8080/foobarbaz"),
+    {ok, Response} = httpc:request("http://localhost:3001/foobarbaz"),
     ?assertEqual(404, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "9"}], headers(Response)),
     ?assertEqual("Not Found", body(Response)).
 
 crash() ->
-    {ok, Response} = httpc:request("http://localhost:8080/crash"),
+    {ok, Response} = httpc:request("http://localhost:3001/crash"),
     ?assertEqual(500, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "21"}], headers(Response)),
@@ -61,7 +61,7 @@ crash() ->
 
 
 no_compress() ->
-    {ok, Response} = httpc:request(get, {"http://localhost:8080/compressed",
+    {ok, Response} = httpc:request(get, {"http://localhost:3001/compressed",
                                          [{"Accept-Encoding", "gzip"}]}, [], []),
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
@@ -70,14 +70,14 @@ no_compress() ->
                  list_to_binary(body(Response))).
 
 exception_flow() ->
-    {ok, Response} = httpc:request("http://localhost:8080/403"),
+    {ok, Response} = httpc:request("http://localhost:3001/403"),
     ?assertEqual(403, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "9"}], headers(Response)),
     ?assertEqual("Forbidden", body(Response)).
 
 user_connection() ->
-    {ok, Response} = httpc:request("http://localhost:8080/close"),
+    {ok, Response} = httpc:request("http://localhost:3001/close"),
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "close"},
                   {"content-length", "7"}], headers(Response)),
@@ -85,11 +85,11 @@ user_connection() ->
 
 
 get_args() ->
-    {ok, Response} = httpc:request("http://localhost:8080/hello?name=knut"),
+    {ok, Response} = httpc:request("http://localhost:3001/hello?name=knut"),
     ?assertEqual("Hello knut", body(Response)).
 
 shorthand() ->
-    {ok, Response} = httpc:request("http://localhost:8080/shorthand"),
+    {ok, Response} = httpc:request("http://localhost:3001/shorthand"),
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "5"}], headers(Response)),
@@ -99,19 +99,19 @@ shorthand() ->
 bad_request() ->
     Headers = lists:duplicate(100, {"X-Foo", "Bar"}),
     ?assertEqual({error, socket_closed_remotely},
-                 httpc:request(get, {"http://localhost:8080/foo", Headers},
+                 httpc:request(get, {"http://localhost:3001/foo", Headers},
                                [], [])),
 
     Body = binary:copy(<<"x">>, 1024 * 1000),
     ?assertEqual({error, socket_closed_remotely},
                  httpc:request(post,
-                               {"http://localhost:8080/foo", [], "foo", Body},
+                               {"http://localhost:3001/foo", [], "foo", Body},
                                [], [])).
 
 
 
 content_length() ->
-    {ok, Response} = httpc:request("http://localhost:8080/304"),
+    {ok, Response} = httpc:request("http://localhost:3001/304"),
 
     ?assertEqual(304, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
@@ -122,7 +122,7 @@ content_length() ->
 chunked() ->
     Expected = "chunk10chunk9chunk8chunk7chunk6chunk5chunk4chunk3chunk2chunk1",
 
-    {ok, Response} = httpc:request("http://localhost:8080/chunked"),
+    {ok, Response} = httpc:request("http://localhost:3001/chunked"),
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   %% httpc adds a content-length, even though elli
@@ -143,7 +143,7 @@ to_proplist_test() ->
                args = [],
                version = {1,1},
                raw_path = <<"/crash">>,
-               headers = [{<<"Host">>,<<"localhost:8080">>}],
+               headers = [{<<"Host">>,<<"localhost:3001">>}],
                body = <<>>,
                pid = self(),
                socket = socket},
@@ -153,7 +153,7 @@ to_proplist_test() ->
             {args,[]},
             {raw_path,<<"/crash">>},
             {version,{1,1}},
-            {headers,[{<<"Host">>,<<"localhost:8080">>}]},
+            {headers,[{<<"Host">>,<<"localhost:3001">>}]},
             {body,<<>>},
             {pid,self()},
             {socket,socket}],
