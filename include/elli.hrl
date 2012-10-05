@@ -23,6 +23,7 @@
 
 
 -record(state, {socket,
+                listening,
                 acceptors,
                 open_reqs,
                 callback :: callback()
@@ -41,4 +42,4 @@
 }).
 
 -define(EXAMPLE_CONF, [{callback, elli_example_callback},
-		       {callback_args, []}]).
+                       {callback_args, []}]).
