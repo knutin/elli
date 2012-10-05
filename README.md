@@ -167,7 +167,7 @@ init([]) ->
 
 ## Extensions
 
- * Access log: https://github.com/knutin/elli/blob/master/src/elli_access_log.erl
+ * Access log: https://github.com/wooga/elli_access_log
  * Real-time statistics dashboard: https://github.com/knutin/elli_stats
  * Basic auth: https://github.com/martinrehfeld/elli_basicauth
  * Static content: https://github.com/chrisavl/elli_fileserve

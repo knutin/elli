@@ -6,10 +6,10 @@
 -module(elli_http).
 -include("../include/elli.hrl").
 
--export([start_link/3, accept/3, handle_request/2, chunk_loop/3,
+-export([start_link/3, accept/3, handle_request/2, chunk_loop/2,
          split_args/1, parse_path/1]).
 
--export([mk_req/6]). %% useful when testing.
+-export([mk_req/7]). %% useful when testing.
 
 
 -spec start_link(pid(), port(), callback()) -> pid().
@@ -44,7 +44,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
     {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
     RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
 
-    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket),
+    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback),
 
     t(user_start),
     case execute_callback(Req, Callback) of
@@ -80,7 +80,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             send_response(Socket, 200, ResponseHeaders, <<"">>, Callback),
             Initial =:= <<"">> orelse send_chunk(Socket, Initial),
 
-            chunk_loop(Socket, Req),
+            start_chunk_loop(Socket, Callback),
 
             t(request_end),
             Mod:handle_event(request_complete,
@@ -110,14 +110,23 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             end
     end.
 
--spec mk_req(Method::http_method(), RawPath::binary(),
-             RequestHeaders::headers(), RequestBody::body(), V::version(),
-             Socket::inet:socket()) -> record(req).
-mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket) ->
-    {Path, URL, URLArgs} = parse_path(RawPath),
-    #req{method = Method, path = URL, args = URLArgs, version = V,
-         raw_path = Path, headers = RequestHeaders, body = RequestBody,
-         pid = self(), socket = Socket}.
+-spec mk_req(Method::http_method(), RawPath::binary(), RequestHeaders::headers(),
+             RequestBody::body(), V::version(), Socket::inet:socket(),
+             Callback::callback()) -> record(req).
+mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
+    {Mod, Args} = Callback,
+    case parse_path(RawPath) of
+        {ok, {Path, URL, URLArgs}} ->
+            #req{method = Method, path = URL, args = URLArgs, version = V,
+                 raw_path = Path, headers = RequestHeaders,
+                 body = RequestBody, pid = self(), socket = Socket};
+        {error, Reason} ->
+            Mod:handle_event(request_parse_error,
+                    [{Reason, {Method, RawPath}}], Args),
+            send_bad_request(Socket),
+            gen_tcp:close(Socket),
+            exit(normal)
+    end.
 
 
 %% @doc: Generates a HTTP response and sends it to the client
@@ -190,19 +199,18 @@ execute_callback(Req, {Mod, Args}) ->
 
 
 %% @doc: The chunk loop is an intermediary between the socket and the
-%% user. We forward anythingthe user sends until the user sends an
+%% user. We forward anything the user sends until the user sends an
 %% empty response, which signals that the connection should be
-%% closed. When the client closes the socket, the loop sticks around
-%% until the user tries to send something again so we can notify about
-%% the closed socket.
-chunk_loop(Socket, Req) ->
+%% closed. When the client closes the socket, the loop exits.
+start_chunk_loop(Socket, Callback) ->
     inet:setopts(Socket, [{active, once}]),
-    ?MODULE:chunk_loop(Socket, Req, open).
+    ?MODULE:chunk_loop(Socket, Callback).
 
-chunk_loop(Socket, Req, open) ->
+chunk_loop(Socket, {Mod, Args} = Callback) ->
     receive
         {tcp_closed, Socket} ->
-            ?MODULE:chunk_loop(Socket, Req, closed);
+            Mod:handle_event(client_closed, [during_response], Args),
+            exit(normal);
 
         {chunk, <<>>} ->
             gen_tcp:send(Socket, <<"0\r\n\r\n">>),
@@ -221,7 +229,7 @@ chunk_loop(Socket, Req, open) ->
 
         {chunk, Data} ->
             send_chunk(Socket, Data),
-            ?MODULE:chunk_loop(Socket, Req, open);
+            ?MODULE:chunk_loop(Socket, Callback);
         {chunk, Data, From} ->
             case send_chunk(Socket, Data) of
                 ok ->
@@ -229,17 +237,9 @@ chunk_loop(Socket, Req, open) ->
                 {error, closed} ->
                     From ! {self(), {error, closed}}
             end,
-            ?MODULE:chunk_loop(Socket, Req, open)
+            ?MODULE:chunk_loop(Socket, Callback)
     after 10000 ->
-            ?MODULE:chunk_loop(Socket, Req, open)
-    end;
-
-chunk_loop(Socket, Req, closed) ->
-    receive
-        {chunk, _, From} ->
-            From ! {self(), {error, closed}}
-    after 10000 ->
-            ?MODULE:chunk_loop(Socket, Req, closed)
+            ?MODULE:chunk_loop(Socket, Callback)
     end.
 
 
@@ -325,7 +325,7 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
         ContentLengthBin ->
             ContentLength = ?b2i(ContentLengthBin),
 
-            case ContentLength < 10240 of
+            case ContentLength < 102400 of
                 true ->
                     case ContentLength - byte_size(Buffer) of
                         0 ->
@@ -418,9 +418,13 @@ content_length(Body)->
 
 parse_path({abs_path, FullPath}) ->
     case binary:split(FullPath, [<<"?">>]) of
-        [URL]       -> {FullPath, split_path(URL), []};
-        [URL, Args] -> {FullPath, split_path(URL), split_args(Args)}
-    end.
+        [URL]       -> {ok, {FullPath, split_path(URL), []}};
+        [URL, Args] -> {ok, {FullPath, split_path(URL), split_args(Args)}}
+    end;
+parse_path({absoluteURI, _Scheme, _Host, _Port, Path}) ->
+    parse_path({abs_path, Path});
+parse_path(_) ->
+    {error, unsupported_uri}.
 
 split_path(<<"/", Path/binary>>) ->
     binary:split(Path, [<<"/">>], [global, trim]);

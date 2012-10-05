@@ -18,18 +18,18 @@ elli_test_() ->
 
 
 short_circuit() ->
-    URL = "http://localhost:8080/middleware/short-circuit",
+    URL = "http://localhost:3002/middleware/short-circuit",
     {ok, Response} = httpc:request(URL),
     ?assertEqual("short circuit!", body(Response)).
 
 hello_world() ->
-    URL = "http://localhost:8080/hello/world",
+    URL = "http://localhost:3002/hello/world",
     {ok, Response} = httpc:request(URL),
     ?assertEqual("Hello World!", body(Response)).
 
 
 compress() ->
-    {ok, Response} = httpc:request(get, {"http://localhost:8080/compressed",
+    {ok, Response} = httpc:request(get, {"http://localhost:3002/compressed",
                                          [{"Accept-Encoding", "gzip"}]}, [], []),
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
@@ -37,7 +37,7 @@ compress() ->
                   {"content-length", "41"}], headers(Response)),
     ?assertEqual(binary:copy(<<"Hello World!">>, 86), zlib:gunzip(body(Response))),
 
-    {ok, Response1} = httpc:request("http://localhost:8080/compressed"),
+    {ok, Response1} = httpc:request("http://localhost:3002/compressed"),
     ?assertEqual(200, status(Response1)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "1032"}], headers(Response1)),
@@ -65,11 +65,6 @@ setup() ->
     application:start(ssl),
     inets:start(),
 
-    %% elli_example_callback:module_info(),
-    %% elli_middleware_compress:module_info(),
-    %% elli_example_middleware:module_info(),
-    %% elli_access_log:module_info(),
-
     Config = [
               {mods, [
                       {elli_access_log, [{name, elli_syslog},
@@ -82,11 +77,12 @@ setup() ->
              ],
 
     {ok, P} = elli:start_link([{callback, elli_middleware},
-                               {callback_args, Config}]),
+                               {callback_args, Config},
+                               {port, 3002}]),
     unlink(P),
-    register(elli, P),
     [P].
 
 teardown(Pids) ->
     [elli:stop(P) || P <- Pids].
+
 
