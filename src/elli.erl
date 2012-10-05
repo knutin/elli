@@ -86,6 +86,7 @@ init([Opts]) ->
                  || _ <- lists:seq(1, MinAcceptors)],
 
     {ok, #state{socket = Socket,
+                listening = Acceptors,
                 acceptors = Acceptors,
                 open_reqs = 0,
                 callback = {Callback, CallbackArgs}}}.
@@ -100,17 +101,27 @@ handle_call(get_open_reqs, _From, State) ->
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
-handle_cast(accepted, State) ->
-    Pid = start_acceptor(State#state.socket, State#state.callback),
-    {noreply, State#state{acceptors = [Pid | State#state.acceptors],
-                          open_reqs = State#state.open_reqs + 1}};
+handle_cast({accepted, APid}, State) ->
+    State0 = remove_listener(State, APid),
+    {noreply, start_add_acceptor(State0)};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'EXIT', Pid, _Reason}, #state{acceptors = Acceptors} = State) ->
-    {noreply, State#state{acceptors = lists:delete(Pid, Acceptors),
-                          open_reqs = State#state.open_reqs - 1}}.
+handle_info({'EXIT', Pid, _Reason}, #state{listening = [Pid]} = State) ->
+    {stop,no_listeners,State};
+handle_info({'EXIT', Pid, _Reason}, #state{listening = Listeners} = State) ->
+    State1 =
+        case lists:member(Pid, Listeners) of
+            true ->
+                error_logger:error_msg(
+                  "A elli worker died before accepting a request", []),
+                remove_listener(State, Pid);
+            false ->
+                State
+        end,
+    State2 = remove_acceptor(State1, Pid),
+    {noreply, State2}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -122,6 +133,18 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+remove_listener(State, Pid) ->
+    State#state{listening = lists:delete(Pid, State#state.listening)}.
+
+remove_acceptor(State, Pid) ->
+    State#state{acceptors = lists:delete(Pid, State#state.acceptors),
+                open_reqs = State#state.open_reqs - 1}.
+
+start_add_acceptor(State) ->
+    Pid = start_acceptor(State#state.socket, State#state.callback),
+    State#state{listening = [Pid | State#state.listening],
+                acceptors = [Pid | State#state.acceptors],
+                open_reqs = State#state.open_reqs + 1}.
 
 start_acceptor(Socket, Callback) ->
     elli_http:start_link(self(), Socket, Callback).

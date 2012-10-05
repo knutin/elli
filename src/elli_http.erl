@@ -25,7 +25,7 @@ accept(Server, ListenSocket, Callback) ->
     case catch gen_tcp:accept(ListenSocket, 1000) of
         {ok, Socket} ->
             t(accepted),
-            gen_server:cast(Server, accepted),
+            gen_server:cast(Server, {accepted, self()}),
             ?MODULE:handle_request(Socket, Callback);
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
