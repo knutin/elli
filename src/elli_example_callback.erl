@@ -46,12 +46,12 @@ handle('GET', [<<"type">>], Req) ->
     Name = elli_request:get_arg(<<"name">>, Req),
     %% Fetch a header.
     case elli_request:get_header(<<"Accept">>, Req, <<"text/plain">>) of
-	<<"text/plain">> ->
-	    {ok, [{<<"Content-type">>, <<"text/plain; charset=ISO-8859-1">>}],
-	     <<"name: ", Name/binary>>};
-	<<"application/json">> ->
-	    {ok, [{<<"Content-type">>, <<"application/json; charset=ISO-8859-1">>}],
-	     <<"{\"name\" : \"", Name/binary, "\"}">>}
+        <<"text/plain">> ->
+            {ok, [{<<"Content-type">>, <<"text/plain; charset=ISO-8859-1">>}],
+             <<"name: ", Name/binary>>};
+        <<"application/json">> ->
+            {ok, [{<<"Content-type">>, <<"application/json; charset=ISO-8859-1">>}],
+             <<"{\"name\" : \"", Name/binary, "\"}">>}
     end;
 
 handle('GET',[<<"headers.html">>], _Req) ->
