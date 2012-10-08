@@ -181,8 +181,8 @@ execute_callback(Req, {Mod, Args}) ->
     catch
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             {response, ResponseCode, Headers, Body};
-        throw:Exception ->
-            Mod:handle_event(request_throw, [Req, Exception, erlang:get_stacktrace()], Args),
+        throw:Exc ->
+            Mod:handle_event(request_throw, [Req, Exc, erlang:get_stacktrace()], Args),
             {response, 500, [], <<"Internal server error">>};
         error:Error ->
             Mod:handle_event(request_error, [Req, Error, erlang:get_stacktrace()], Args),
