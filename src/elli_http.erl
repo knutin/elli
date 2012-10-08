@@ -330,7 +330,7 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
                     case ContentLength - byte_size(Buffer) of
                         0 ->
                             Buffer;
-                        N ->
+                        N when N >= 0 ->
                             case gen_tcp:recv(Socket, N, 30000) of
                                 {ok, Data} ->
                                     <<Buffer/binary, Data/binary>>;
@@ -342,7 +342,13 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
                                     Mod:handle_event(client_timeout, [receiving_body], Args),
                                     ok = gen_tcp:close(Socket),
                                     exit(normal)
-                            end
+                            end;
+                        _N ->
+                            Mod:handle_event(bad_request,
+                                             [{content_length, ContentLength},
+                                              {buffer, Buffer}]),
+                            gen_tcp:close(Socket),
+                            exit(normal)
                     end;
                 false ->
                     Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),
