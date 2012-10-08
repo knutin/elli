@@ -1,7 +1,10 @@
 %%% @author Andreas Hasselberg <andreas.hasselberg@gmail.com>
-%%% @doc
-%%%  Helpers for creating unit tests for elli callbacks.
-%%%  The unit tests below tests elli_example_callback.
+%%%
+%%% @doc Helper for calling your Elli callback in unit tests. Only the
+%%%  callback specified is actually run. Ellis response handling is
+%%%  not used, so the headers will for example not include a content
+%%%  length and the return format is not standardized.  The unit tests
+%%%  below tests elli_example_callback.
 %%% @end
 
 -module(elli_test).
