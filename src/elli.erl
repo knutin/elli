@@ -86,7 +86,6 @@ init([Opts]) ->
                  || _ <- lists:seq(1, MinAcceptors)],
 
     {ok, #state{socket = Socket,
-                listening = Acceptors,
                 acceptors = Acceptors,
                 open_reqs = 0,
                 callback = {Callback, CallbackArgs}}}.
@@ -101,27 +100,25 @@ handle_call(get_open_reqs, _From, State) ->
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
-handle_cast({accepted, APid}, State) ->
-    State0 = remove_listener(State, APid),
-    {noreply, start_add_acceptor(State0)};
+handle_cast(accepted, State) ->
+    {noreply, start_add_acceptor(State)};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'EXIT', Pid, _Reason}, #state{listening = [Pid]} = State) ->
-    {stop,no_listeners,State};
-handle_info({'EXIT', Pid, _Reason}, #state{listening = Listeners} = State) ->
-    State1 =
-        case lists:member(Pid, Listeners) of
-            true ->
-                error_logger:error_msg(
-                  "A elli worker died before accepting a request", []),
-                remove_listener(State, Pid);
-            false ->
-                State
-        end,
-    State2 = remove_acceptor(State1, Pid),
-    {noreply, State2}.
+
+handle_info({'EXIT', _Pid, {error, emfile}}, State) ->
+    error_logger:error_msg("No more file descriptors, shutting down~n"),
+    {stop, emfile, State};
+
+handle_info({'EXIT', Pid, normal}, State) ->
+    {noreply, remove_acceptor(State, Pid)};
+
+handle_info({'EXIT', Pid, Reason}, State) ->
+    error_logger:error_msg("Elli request (pid ~p) unexpectedly "
+                           "crashed:~n~p~n", [Pid, Reason]),
+    {noreply, remove_acceptor(State, Pid)}.
+
 
 terminate(_Reason, _State) ->
     ok.
@@ -133,17 +130,13 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-remove_listener(State, Pid) ->
-    State#state{listening = lists:delete(Pid, State#state.listening)}.
-
 remove_acceptor(State, Pid) ->
     State#state{acceptors = lists:delete(Pid, State#state.acceptors),
                 open_reqs = State#state.open_reqs - 1}.
 
 start_add_acceptor(State) ->
     Pid = start_acceptor(State#state.socket, State#state.callback),
-    State#state{listening = [Pid | State#state.listening],
-                acceptors = [Pid | State#state.acceptors],
+    State#state{acceptors = [Pid | State#state.acceptors],
                 open_reqs = State#state.open_reqs + 1}.
 
 start_acceptor(Socket, Callback) ->
