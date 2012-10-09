@@ -338,7 +338,7 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
                     case ContentLength - byte_size(Buffer) of
                         0 ->
                             Buffer;
-                        N when N >= 0 ->
+                        N when N > 0 ->
                             case gen_tcp:recv(Socket, N, 30000) of
                                 {ok, Data} ->
                                     <<Buffer/binary, Data/binary>>;
