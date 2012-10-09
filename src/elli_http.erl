@@ -354,7 +354,7 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
                         _N ->
                             Mod:handle_event(bad_request,
                                              [{content_length, ContentLength},
-                                              {buffer, Buffer}]),
+                                              {buffer, Buffer}], Args),
                             gen_tcp:close(Socket),
                             exit(normal)
                     end;
