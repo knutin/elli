@@ -3,6 +3,8 @@
 -include("elli.hrl").
 
 
+-define(i2b(I), list_to_binary(integer_to_list(I))).
+
 elli_test_() ->
     {setup,
      fun setup/0, fun teardown/1,
@@ -18,7 +20,8 @@ elli_test_() ->
       ?_test(bad_request()),
       ?_test(content_length()),
       ?_test(chunked()),
-      ?_test(sendfile())
+      ?_test(sendfile()),
+      ?_test(slow_client())
      ]}.
 
 
@@ -34,6 +37,12 @@ setup() ->
 
 teardown(Pids) ->
     [elli:stop(P) || P <- Pids].
+
+
+%%
+%% INTEGRATION TESTS
+%% Uses inets httpc to actually call Elli over the network
+%%
 
 hello_world() ->
     URL = "http://localhost:3001/hello/world",
@@ -143,6 +152,46 @@ sendfile() ->
     ?assertEqual(binary_to_list(Expected), body(Response)).
 
 
+slow_client() ->
+    Body = <<"name=foobarbaz">>,
+    Headers = <<"Content-Length: ",(?i2b(size(Body)))/binary, "\r\n\r\n">>,
+    Client = start_slow_client(3001, "/hello"),
+
+    send(Client, Headers, 1),
+    send(Client, Body, size(Body)),
+
+    ?assertEqual({ok, <<"HTTP/1.1 200 OK\r\n"
+                        "Connection: Keep-Alive\r\n"
+                        "Content-Length: 15\r\n"
+                        "\r\n"
+                        "Hello undefined">>},
+                 gen_tcp:recv(Client, 0)).
+
+start_slow_client(Port, Url) ->
+    case gen_tcp:connect("127.0.0.1", Port, [{active, false}, binary]) of
+        {ok, Socket} ->
+            gen_tcp:send(Socket, "GET " ++ Url ++ " HTTP/1.1\r\n"),
+            Socket;
+        {error, Reason} ->
+            throw({slow_client_error, Reason})
+    end.
+
+send(_Socket, <<>>, _) ->
+    ok;
+send(Socket, B, ChunkSize) ->
+    {Part, Rest} = case B of
+                       <<P:ChunkSize/binary, R/binary>> -> {P, R};
+                       P -> {P, <<>>}
+           end,
+    %%error_logger:info_msg("~p~n", [Part]),
+    gen_tcp:send(Socket, Part),
+    timer:sleep(1),
+    send(Socket, Rest, ChunkSize).
+
+
+%%
+%% UNIT TESTS
+%%
 
 
 body_qs_test() ->
