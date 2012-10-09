@@ -6,7 +6,7 @@
 -module(elli_http).
 -include("../include/elli.hrl").
 
--export([start_link/3, accept/3, handle_request/2, chunk_loop/2,
+-export([start_link/3, accept/3, handle_request/2, chunk_loop/1,
          split_args/1, parse_path/1]).
 
 -export([mk_req/7]). %% useful when testing.
@@ -80,11 +80,14 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             send_response(Socket, 200, ResponseHeaders, <<"">>, Callback),
             Initial =:= <<"">> orelse send_chunk(Socket, Initial),
 
-            start_chunk_loop(Socket, Callback),
+            ClosingEnd = case start_chunk_loop(Socket) of
+                             {error, client_closed} -> client;
+                             ok -> server
+                         end,
 
             t(request_end),
-            Mod:handle_event(request_complete,
-                             [Req, 200, ResponseHeaders, <<>>, get_timings()],
+            Mod:handle_event(chunk_complete,
+                             [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
                              Args),
             ok;
 
@@ -202,20 +205,23 @@ execute_callback(Req, {Mod, Args}) ->
 %% user. We forward anything the user sends until the user sends an
 %% empty response, which signals that the connection should be
 %% closed. When the client closes the socket, the loop exits.
-start_chunk_loop(Socket, Callback) ->
+start_chunk_loop(Socket) ->
     inet:setopts(Socket, [{active, once}]),
-    ?MODULE:chunk_loop(Socket, Callback).
+    ?MODULE:chunk_loop(Socket).
 
-chunk_loop(Socket, {Mod, Args} = Callback) ->
+chunk_loop(Socket) ->
     receive
         {tcp_closed, Socket} ->
-            Mod:handle_event(client_closed, [during_response], Args),
-            exit(normal);
+            {error, client_closed};
 
         {chunk, <<>>} ->
-            gen_tcp:send(Socket, <<"0\r\n\r\n">>),
-            gen_tcp:close(Socket),
-            ok;
+            case gen_tcp:send(Socket, <<"0\r\n\r\n">>) of
+                ok ->
+                    gen_tcp:close(Socket),
+                    ok;
+                {error, closed} ->
+                    {error, client_closed}
+            end;
         {chunk, <<>>, From} ->
             case gen_tcp:send(Socket, <<"0\r\n\r\n">>) of
                 ok ->
@@ -229,7 +235,7 @@ chunk_loop(Socket, {Mod, Args} = Callback) ->
 
         {chunk, Data} ->
             send_chunk(Socket, Data),
-            ?MODULE:chunk_loop(Socket, Callback);
+            ?MODULE:chunk_loop(Socket);
         {chunk, Data, From} ->
             case send_chunk(Socket, Data) of
                 ok ->
@@ -237,9 +243,9 @@ chunk_loop(Socket, {Mod, Args} = Callback) ->
                 {error, closed} ->
                     From ! {self(), {error, closed}}
             end,
-            ?MODULE:chunk_loop(Socket, Callback)
+            ?MODULE:chunk_loop(Socket)
     after 10000 ->
-            ?MODULE:chunk_loop(Socket, Callback)
+            ?MODULE:chunk_loop(Socket)
     end.
 
 
