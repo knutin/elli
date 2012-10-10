@@ -328,46 +328,59 @@ get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
     end.
 
 -spec get_body(port(), headers(), binary(), callback()) -> body().
-get_body(Socket, Headers, Buffer, {Mod, Args}) ->
+%% @doc: Fetches the full body of the request, if any is available.
+%%
+%% At the moment we don't need to handle large requests, so there is
+%% no need for streaming or lazily fetching the body in the user
+%% code. Fully receiving the body allows us to avoid the complex
+%% request object threading in Cowboy and the caching in Mochiweb.
+%%
+%% As we are always receiving whatever the client sends, we might have
+%% buffered too much and get parts of the next pipelined request. In
+%% that case, push it back in the buffer and handle the first request.
+get_body(Socket, Headers, Buffer, {Mod, Args} = Callback) ->
     case proplists:get_value(<<"Content-Length">>, Headers, undefined) of
         undefined ->
             <<>>;
         ContentLengthBin ->
             ContentLength = ?b2i(ContentLengthBin),
 
-            case ContentLength < 102400 of
-                true ->
-                    case ContentLength - byte_size(Buffer) of
-                        0 ->
-                            Buffer;
-                        N when N > 0 ->
-                            case gen_tcp:recv(Socket, N, 30000) of
-                                {ok, Data} ->
-                                    <<Buffer/binary, Data/binary>>;
-                                {error, closed} ->
-                                    Mod:handle_event(client_closed, [receiving_body], Args),
-                                    ok = gen_tcp:close(Socket),
-                                    exit(normal);
-                                {error, timeout} ->
-                                    Mod:handle_event(client_timeout, [receiving_body], Args),
-                                    ok = gen_tcp:close(Socket),
-                                    exit(normal)
-                            end;
-                        _ ->
-                            <<Body:ContentLength/binary, Rest/binary>> = Buffer,
-                            gen_tcp:unrecv(Socket, Rest),
-                            Body
+            ok = check_max_size(Socket, ContentLength, Callback),
+
+            case ContentLength - byte_size(Buffer) of
+                0 ->
+                    Buffer;
+                N when N > 0 ->
+                    case gen_tcp:recv(Socket, N, 30000) of
+                        {ok, Data} ->
+                            <<Buffer/binary, Data/binary>>;
+                        {error, closed} ->
+                            Mod:handle_event(client_closed, [receiving_body], Args),
+                            ok = gen_tcp:close(Socket),
+                            exit(normal);
+                        {error, timeout} ->
+                            Mod:handle_event(client_timeout, [receiving_body], Args),
+                            ok = gen_tcp:close(Socket),
+                            exit(normal)
                     end;
-                false ->
-                    Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),
-                    gen_tcp:close(Socket),
-                    exit(normal)
+                _ ->
+                    <<Body:ContentLength/binary, Rest/binary>> = Buffer,
+                    gen_tcp:unrecv(Socket, Rest),
+                    Body
             end
     end.
 
 
 ensure_binary(Bin) when is_binary(Bin) -> Bin;
 ensure_binary(Atom) when is_atom(Atom) -> atom_to_binary(Atom, latin1).
+
+
+check_max_size(_, ContentLength, _) when ContentLength < 102400 ->
+    ok;
+check_max_size(Socket, N, {Mod, Args}) ->
+    Mod:handle_event(bad_request, [{body_size, N}], Args),
+    gen_tcp:close(Socket),
+    exit(normal).
 
 
 %%
