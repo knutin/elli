@@ -208,6 +208,8 @@ execute_callback(Req, {Mod, Args}) ->
 %% empty response, which signals that the connection should be
 %% closed. When the client closes the socket, the loop exits.
 start_chunk_loop(Socket) ->
+    %% Set the socket to active so we receive the tcp_closed message
+    %% if the client closes the connection
     inet:setopts(Socket, [{active, once}]),
     ?MODULE:chunk_loop(Socket).
 
