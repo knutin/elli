@@ -353,12 +353,10 @@ get_body(Socket, Headers, Buffer, {Mod, Args}) ->
                                     ok = gen_tcp:close(Socket),
                                     exit(normal)
                             end;
-                        _N ->
-                            Mod:handle_event(bad_request,
-                                             [{content_length, ContentLength},
-                                              {buffer, Buffer}], Args),
-                            gen_tcp:close(Socket),
-                            exit(normal)
+                        _ ->
+                            <<Body:ContentLength/binary, Rest/binary>> = Buffer,
+                            gen_tcp:unrecv(Socket, Rest),
+                            Body
                     end;
                 false ->
                     Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),

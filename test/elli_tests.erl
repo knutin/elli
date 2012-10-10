@@ -21,7 +21,8 @@ elli_test_() ->
       ?_test(content_length()),
       ?_test(chunked()),
       ?_test(sendfile()),
-      ?_test(slow_client())
+      ?_test(slow_client()),
+      ?_test(pipeline())
      ]}.
 
 
@@ -166,6 +167,34 @@ slow_client() ->
                         "\r\n"
                         "Hello undefined">>},
                  gen_tcp:recv(Client, 0)).
+
+
+pipeline() ->
+    Body = <<"name=quux">>,
+    Headers = <<"Content-Length: ",(?i2b(size(Body)))/binary, "\r\n\r\n">>,
+
+    {ok, Socket} = gen_tcp:connect("127.0.0.1", 3001, [{active, false}, binary]),
+
+    Req = <<"GET /hello?name=elli HTTP/1.1\r\n",
+            Headers/binary,
+            Body/binary>>,
+
+    gen_tcp:send(Socket, <<Req/binary, Req/binary>>),
+
+    {ok, Res} = gen_tcp:recv(Socket, 0),
+    ?assertEqual(binary:copy(<<"HTTP/1.1 200 OK\r\n"
+                               "Connection: Keep-Alive\r\n"
+                               "Content-Length: 10\r\n"
+                               "\r\n"
+                               "Hello elli">>, 2),
+                 Res).
+
+
+
+
+%%
+%% Slow client, sending only the specified byte size every millisecond
+%%
 
 start_slow_client(Port, Url) ->
     case gen_tcp:connect("127.0.0.1", Port, [{active, false}, binary]) of
