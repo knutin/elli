@@ -4,6 +4,7 @@
 -export([send_chunk/2
          , async_send_chunk/2
          , chunk_ref/1
+         , close_chunk/1
          , path/1
          , raw_path/1
          , query_str/1
@@ -103,6 +104,12 @@ chunk_ref(#req{version = {1, 1}} = Req) ->
 chunk_ref(#req{}) ->
     {error, not_supported}.
 
+
+%% @doc: Explicitly close the chunked connection. Returns {error,
+%% closed} if the client already closed the connection.
+close_chunk(Ref) ->
+    send_chunk(Ref, <<"">>).
+
 %% @doc: Sends a chunk asynchronously
 async_send_chunk(Ref, Data) ->
     Ref ! {chunk, Data}.
@@ -127,7 +134,7 @@ send_chunk(Ref, Data, Timeout) ->
     end.
 
 is_ref_alive(Ref) ->
-    case node(Ref) =:= node(self()) of
+    case node(Ref) =:= node() of
         true -> is_process_alive(Ref);
         false -> rpc:call(node(Ref), erlang, is_process_alive, [Ref])
     end.

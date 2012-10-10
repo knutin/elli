@@ -95,8 +95,8 @@ handle('GET', [<<"chunked">>], Req) ->
     %% browser.
     %%
     %% Calling elli_request:send_chunk(ChunkRef, Body) will send that
-    %% chunk to the client. An empty body will close the
-    %% connection. See chunk_loop/1 below.
+    %% part to the client. elli_request:close_chunk(ChunkRef) will
+    %% close the response.
     %%
     %% Return immediately {chunk, Headers} to signal we want to chunk.
     Ref = elli_request:chunk_ref(Req),
@@ -128,8 +128,7 @@ chunk_loop(Ref) ->
     chunk_loop(Ref, 10).
 
 chunk_loop(Ref, 0) ->
-    %% Send empty chunk to make elli close the connection
-    elli_request:send_chunk(Ref, <<>>);
+    elli_request:close_chunk(Ref);
 chunk_loop(Ref, N) ->
     timer:sleep(10),
 
