@@ -42,12 +42,11 @@ handle('POST', [<<"hello">>], Req) ->
     {ok, [], <<"Hello ", Name/binary>>};
 
 handle('GET', [<<"hello">>, <<"iolist">>], Req) ->
-    %% Fetch a get argument from the URL.
+    %% Iolists will be kept as iolists all the way to the socket.
     Name = elli_request:get_arg(<<"name">>, Req),
     {ok, [], [<<"Hello ">>, Name]};
 
 handle('GET', [<<"type">>], Req) ->
-    %% Fetch a get argument from the URL.
     Name = elli_request:get_arg(<<"name">>, Req),
     %% Fetch a header.
     case elli_request:get_header(<<"Accept">>, Req, <<"text/plain">>) of
@@ -63,11 +62,26 @@ handle('GET',[<<"headers.html">>], _Req) ->
     %% Set custom headers, for example 'Content-Type'
     {ok, [{<<"X-Custom">>, <<"foobar">>}], <<"see headers">>};
 
-handle('GET',[<<"close">>], _Req) ->
-    %% Set a custom connection header. Elli will by default use
-    %% keep-alive if the browser supports it, this will override that
-    %% behaviour.
-    {ok, [{<<"Connection">>, <<"close">>}], <<"closing">>};
+handle('GET',[<<"user">>, <<"defined">>, <<"behaviour">>], _Req) ->
+    %% If you return any of the following HTTP headers, you can
+    %% override the default behaviour of Elli:
+    %%
+    %%  * Connection: By default Elli will use keep-alive if the
+    %%                protocol supports it, setting "close" will close
+    %%                the connection immediately after Elli has sent
+    %%                the response. If the client has already sent
+    %%                pipelined requests, these will be discarded.
+    %%
+    %%  * Content-Length: By default Elli looks at the size of the
+    %%                    body you returned to determine the
+    %%                    Content-Length header. Explicitly including
+    %%                    your own Content-Length (with the value as
+    %%                    int, binary or list) allows you to return an
+    %%                    empty body. Useful for implementing the "304
+    %%                    Not Modified" response.
+    %%
+    {304, [{<<"Connection">>, <<"close">>},
+           {<<"Content-Length">>, <<"123">>}], <<"ignored">>};
 
 handle('GET', [<<"crash">>], _Req) ->
     %% Throwing an exception results in a 500 response and

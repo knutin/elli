@@ -89,11 +89,11 @@ exception_flow() ->
     ?assertEqual("Forbidden", body(Response)).
 
 user_connection() ->
-    {ok, Response} = httpc:request("http://localhost:3001/close"),
-    ?assertEqual(200, status(Response)),
+    {ok, Response} = httpc:request("http://localhost:3001/user/defined/behaviour"),
+    ?assertEqual(304, status(Response)),
     ?assertEqual([{"connection", "close"},
-                  {"content-length", "7"}], headers(Response)),
-    ?assertEqual("closing", body(Response)).
+                  {"content-length", "123"}], headers(Response)),
+    ?assertEqual([], body(Response)).
 
 
 get_args() ->

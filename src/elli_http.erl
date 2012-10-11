@@ -55,7 +55,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
 
             ResponseHeaders = [
                                connection(Req, UserHeaders),
-                               content_length(UserBody)
+                               content_length(UserHeaders, UserBody)
                                | UserHeaders
                               ],
             send_response(Socket, Method, ResponseCode, ResponseHeaders, UserBody, Callback),
@@ -442,8 +442,13 @@ connection(Req, UserHeaders) ->
             []
     end.
 
-content_length(Body)->
-    {<<"Content-Length">>, iolist_size(Body)}.
+content_length(Headers, Body)->
+    case proplists:get_value(<<"Content-Length">>, Headers) of
+        undefined ->
+            {<<"Content-Length">>, iolist_size(Body)};
+        ContentLength ->
+            {<<"Content-Length">>, ContentLength}
+    end.
 
 %%
 %% PATH HELPERS
