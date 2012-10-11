@@ -12,8 +12,8 @@
          , get_arg/2
          , get_arg/3
          , get_args/1
-         , get_post_arg/2
-         , get_post_arg/3
+         , post_arg/2
+         , post_arg/3
          , body_qs/1
          , headers/1
          , peer/1
@@ -65,10 +65,10 @@ get_arg(Key, #req{args = Args}, Default) ->
 body_qs(#req{body = Body}) ->
     elli_http:split_args(Body).
 
-get_post_arg(Key, #req{} = Req) ->
-    get_post_arg(Key, #req{} = Req, undefined).
+post_arg(Key, #req{} = Req) ->
+    post_arg(Key, #req{} = Req, undefined).
 
-get_post_arg(Key, #req{} = Req, Default) ->
+post_arg(Key, #req{} = Req, Default) ->
     proplists:get_value(Key, body_qs(Req), Default).
 
 

@@ -38,7 +38,7 @@ handle('GET', [<<"hello">>], Req) ->
 
 handle('POST', [<<"hello">>], Req) ->
     %% Fetch a POST argument from the POST body.
-    Name = elli_request:get_post_arg(<<"name">>, Req, <<"undefined">>),
+    Name = elli_request:post_arg(<<"name">>, Req, <<"undefined">>),
     {ok, [], <<"Hello ", Name/binary>>};
 
 handle('GET', [<<"hello">>, <<"iolist">>], Req) ->
