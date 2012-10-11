@@ -58,7 +58,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                                content_length(UserBody)
                                | UserHeaders
                               ],
-            send_response(Socket, ResponseCode, ResponseHeaders, UserBody, Callback),
+            send_response(Socket, Method, ResponseCode, ResponseHeaders, UserBody, Callback),
 
             t(request_end),
             Mod:handle_event(request_complete,
@@ -79,7 +79,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             ResponseHeaders = [{<<"Transfer-Encoding">>, <<"chunked">>},
                                connection(Req, UserHeaders)
                                | UserHeaders],
-            send_response(Socket, 200, ResponseHeaders, <<"">>, Callback),
+            send_response(Socket, Method, 200, ResponseHeaders, <<"">>, Callback),
             Initial =:= <<"">> orelse send_chunk(Socket, Initial),
 
             ClosingEnd = case start_chunk_loop(Socket) of
@@ -135,7 +135,13 @@ mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
 
 
 %% @doc: Generates a HTTP response and sends it to the client
-send_response(Socket, Code, Headers, Body, {Mod, Args}) ->
+send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
+    Body = case {Method, Code} of
+               {'HEAD', _} -> <<>>;
+               {_, 304}    -> <<>>;
+               _           -> UserBody
+           end,
+
     Response = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                 encode_headers(Headers), <<"\r\n">>,
                 Body],

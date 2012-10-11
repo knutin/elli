@@ -22,7 +22,9 @@ elli_test_() ->
       ?_test(chunked()),
       ?_test(sendfile()),
       ?_test(slow_client()),
-      ?_test(pipeline())
+      ?_test(pipeline()),
+      ?_test(head()),
+      ?_test(no_body())
      ]}.
 
 
@@ -125,7 +127,8 @@ content_length() ->
 
     ?assertEqual(304, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
-                  {"content-length", "0"}], headers(Response)),
+                  {"content-length", "7"},
+                  {"etag", "foobar"}], headers(Response)),
     ?assertEqual([], body(Response)).
 
 
@@ -188,6 +191,23 @@ pipeline() ->
                                "\r\n"
                                "Hello elli">>, 2),
                  Res).
+
+head() ->
+    {ok, Response} = httpc:request(head, {"http://localhost:3001/head", []},
+                                   [], []),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "20"}], headers(Response)),
+    ?assertEqual([], body(Response)).
+
+
+no_body() ->
+    {ok, Response} = httpc:request("http://localhost:3001/304"),
+    ?assertEqual(304, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "7"},
+                  {"etag", "foobar"}], headers(Response)),
+    ?assertEqual([], body(Response)).
 
 
 

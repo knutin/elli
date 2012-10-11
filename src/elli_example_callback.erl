@@ -90,6 +90,9 @@ handle('GET', [<<"compressed">>], _Req) ->
     %% elli_middleware_compress
     {ok, binary:copy(<<"Hello World!">>, 86)};
 
+handle('HEAD', [<<"head">>], _Req) ->
+    {200, [], <<"body must be ignored">>};
+
 handle('GET', [<<"chunked">>], Req) ->
     %% Start a chunked response for streaming real-time events to the
     %% browser.
@@ -107,7 +110,9 @@ handle('GET', [<<"shorthand">>], _Req) ->
     {200, <<"hello">>};
 
 handle('GET', [<<"304">>], _Req) ->
-    {304, [], <<>>};
+    %% A "Not Modified" response is exactly like a normal response (so
+    %% Content-Length is included), but the body will not be sent.
+    {304, [{<<"Etag">>, <<"foobar">>}], <<"Ignored">>};
 
 handle('GET', [<<"302">>], _Req) ->
     {302, [{<<"Location">>, <<"/hello/world">>}], <<>>};
