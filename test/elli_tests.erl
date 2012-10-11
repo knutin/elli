@@ -16,6 +16,7 @@ elli_test_() ->
       ?_test(exception_flow()),
       ?_test(user_connection()),
       ?_test(get_args()),
+      ?_test(post_args()),
       ?_test(shorthand()),
       ?_test(bad_request()),
       ?_test(content_length()),
@@ -100,6 +101,17 @@ get_args() ->
     {ok, Response} = httpc:request("http://localhost:3001/hello?name=knut"),
     ?assertEqual("Hello knut", body(Response)).
 
+post_args() ->
+    Body = <<"name=foo&baz=quux">>,
+    ContentType = "application/x-www-form-urlencoded",
+
+    {ok, Response} = httpc:request(
+                       post,
+                       {"http://localhost:3001/hello", [], ContentType, Body},
+                       [], []),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual("Hello foo", body(Response)).
+
 shorthand() ->
     {ok, Response} = httpc:request("http://localhost:3001/shorthand"),
     ?assertEqual(200, status(Response)),
@@ -117,7 +129,7 @@ bad_request() ->
     Body = binary:copy(<<"x">>, 1024 * 1000),
     ?assertEqual({error, socket_closed_remotely},
                  httpc:request(post,
-                               {"http://localhost:3001/foo", [], "foo", Body},
+                               {"http://localhost:3001/foo", [], [], Body},
                                [], [])).
 
 
@@ -244,8 +256,14 @@ send(Socket, B, ChunkSize) ->
 
 
 body_qs_test() ->
-    ?assertEqual([{<<"foo">>, <<"bar">>}, {<<"baz">>, <<"bang">>}, {<<"found">>, true}],
-                 elli_request:body_qs(#req{body = <<"foo=bar&baz=bang&found">>})).
+    Expected = [{<<"foo">>, <<"bar">>},
+                {<<"baz">>, <<"bang">>},
+                {<<"found">>, true}],
+    Body = <<"foo=bar&baz=bang&found">>,
+    Headers = [{<<"Content-Type">>, <<"application/x-www-form-urlencoded">>}],
+
+    ?assertEqual(Expected, elli_request:body_qs(#req{body = Body,
+                                                     headers = Headers})).
 
 to_proplist_test() ->
     Req = #req{method = 'GET',

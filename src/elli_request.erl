@@ -62,8 +62,13 @@ get_arg(Key, #req{args = Args}, Default) ->
     proplists:get_value(Key, Args, Default).
 
 %% @doc Parses application/x-www-form-urlencoded body into a proplist
-body_qs(#req{body = Body}) ->
-    elli_http:split_args(Body).
+body_qs(#req{body = Body} = Req) ->
+    case get_header(<<"Content-Type">>, Req) of
+        <<"application/x-www-form-urlencoded">> ->
+            elli_http:split_args(Body);
+        _ ->
+            erlang:error(badarg)
+    end.
 
 post_arg(Key, #req{} = Req) ->
     post_arg(Key, #req{} = Req, undefined).
