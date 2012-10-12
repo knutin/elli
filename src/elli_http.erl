@@ -282,9 +282,11 @@ get_request(Socket, Buffer, {Mod, Args} = Callback) ->
                     get_request(Socket, NewBuffer, Callback)
             end;
         {error, timeout} ->
+            Mod:handle_event(request_timeout, [], Args),
             gen_tcp:close(Socket),
             exit(normal);
         {error, closed} ->
+            Mod:handle_event(request_closed, [], Args),
             gen_tcp:close(Socket),
             exit(normal)
     end.
