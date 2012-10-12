@@ -26,7 +26,14 @@ accept(Server, ListenSocket, Callback) ->
         {ok, Socket} ->
             t(accepted),
             gen_server:cast(Server, accepted),
-            ?MODULE:handle_request(Socket, Callback);
+
+            case ?MODULE:handle_request(Socket, Callback) of
+                keep_alive ->
+                    ?MODULE:handle_request(Socket, Callback);
+                close ->
+                    gen_tcp:close(Socket),
+                    ok
+            end;
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
         {error, econnaborted} ->
@@ -53,11 +60,9 @@ handle_request(Socket, {Mod, Args} = Callback) ->
         {response, ResponseCode, UserHeaders, UserBody} ->
             t(user_end),
 
-            ResponseHeaders = [
-                               connection(Req, UserHeaders),
+            ResponseHeaders = [connection(Req, UserHeaders),
                                content_length(UserHeaders, UserBody)
-                               | UserHeaders
-                              ],
+                               | UserHeaders],
             send_response(Socket, Method, ResponseCode, ResponseHeaders, UserBody, Callback),
 
             t(request_end),
@@ -65,13 +70,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                              [Req, ResponseCode, ResponseHeaders, UserBody, get_timings()],
                              Args),
 
-            case close_or_keepalive(Req, UserHeaders) of
-                keep_alive ->
-                    ?MODULE:handle_request(Socket, Callback);
-                close ->
-                    gen_tcp:close(Socket),
-                    ok
-            end;
+            close_or_keepalive(Req, UserHeaders);
 
         {chunk, UserHeaders, Initial} ->
             t(user_end),
@@ -91,7 +90,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             Mod:handle_event(chunk_complete,
                              [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
                              Args),
-            ok;
+            close;
 
         {file, ResponseCode, UserHeaders, Filename} ->
             t(user_end),
@@ -106,13 +105,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                              [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
                              Args),
 
-            case close_or_keepalive(Req, UserHeaders) of
-                keep_alive ->
-                    ?MODULE:handle_request(Socket, Callback);
-                close ->
-                    gen_tcp:close(Socket),
-                    ok
-            end
+            close_or_keepalive(Req, UserHeaders)
     end.
 
 -spec mk_req(Method::http_method(), RawPath::binary(), RequestHeaders::headers(),
