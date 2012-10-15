@@ -7,7 +7,7 @@
 -include("../include/elli.hrl").
 
 -export([start_link/3, accept/3, handle_request/2, chunk_loop/1,
-         split_args/1, parse_path/1]).
+         split_args/1, parse_path/1, keepalive_loop/3]).
 
 -export([mk_req/7]). %% useful when testing.
 
@@ -21,19 +21,12 @@ start_link(Server, ListenSocket, Callback) ->
 %% request, then loops if we're using keep alive or chunked
 %% transfer. If accept doesn't give us a socket within 10 seconds, we
 %% loop to allow code upgrades.
-accept(Server, ListenSocket, Callback) ->
+accept(Server, ListenSocket, {Mod, Args} = Callback) ->
     case catch gen_tcp:accept(ListenSocket, 10000) of
         {ok, Socket} ->
             t(accepted),
             gen_server:cast(Server, accepted),
-
-            case ?MODULE:handle_request(Socket, Callback) of
-                keep_alive ->
-                    ?MODULE:handle_request(Socket, Callback);
-                close ->
-                    gen_tcp:close(Socket),
-                    ok
-            end;
+            ?MODULE:keepalive_loop(Socket, 0, Callback);
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
         {error, econnaborted} ->
@@ -42,6 +35,17 @@ accept(Server, ListenSocket, Callback) ->
             ok;
         {error, Other} ->
             exit({error, Other})
+    end.
+
+
+%% @doc: Handle multiple requests on the same connection
+keepalive_loop(Socket, NumRequests, Callback) ->
+    case ?MODULE:handle_request(Socket, Callback) of
+        keep_alive ->
+            ?MODULE:keepalive_loop(Socket, NumRequests, Callback);
+        close ->
+            gen_tcp:close(Socket),
+            ok
     end.
 
 -spec handle_request(port(), callback()) -> ok.
