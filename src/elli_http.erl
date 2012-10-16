@@ -136,6 +136,7 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
     Body = case {Method, Code} of
                {'HEAD', _} -> <<>>;
                {_, 304}    -> <<>>;
+               {_, 204}    -> <<>>;
                _           -> UserBody
            end,
 
