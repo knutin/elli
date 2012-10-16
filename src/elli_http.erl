@@ -6,8 +6,8 @@
 -module(elli_http).
 -include("../include/elli.hrl").
 
--export([start_link/3, accept/3, handle_request/2, chunk_loop/1,
-         split_args/1, parse_path/1, keepalive_loop/3]).
+-export([start_link/3, accept/3, handle_request/3, chunk_loop/1,
+         split_args/1, parse_path/1, keepalive_loop/2, keepalive_loop/4]).
 
 -export([mk_req/7]). %% useful when testing.
 
@@ -26,7 +26,7 @@ accept(Server, ListenSocket, {Mod, Args} = Callback) ->
         {ok, Socket} ->
             t(accepted),
             gen_server:cast(Server, accepted),
-            ?MODULE:keepalive_loop(Socket, 0, Callback);
+            ?MODULE:keepalive_loop(Socket, Callback);
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
         {error, econnaborted} ->
@@ -38,24 +38,29 @@ accept(Server, ListenSocket, {Mod, Args} = Callback) ->
     end.
 
 
-%% @doc: Handle multiple requests on the same connection
-keepalive_loop(Socket, NumRequests, Callback) ->
-    case ?MODULE:handle_request(Socket, Callback) of
-        keep_alive ->
-            ?MODULE:keepalive_loop(Socket, NumRequests, Callback);
-        close ->
+%% @doc: Handle multiple requests on the same connection, ie. "keep
+%% alive".
+keepalive_loop(Socket, Callback) ->
+    keepalive_loop(Socket, 0, <<>>, Callback).
+
+keepalive_loop(Socket, NumRequests, Buffer, Callback) ->
+    case ?MODULE:handle_request(Socket, Buffer, Callback) of
+        {keep_alive, NewBuffer} ->
+            ?MODULE:keepalive_loop(Socket, NumRequests, NewBuffer, Callback);
+        {close, _} ->
             gen_tcp:close(Socket),
             ok
     end.
 
--spec handle_request(port(), callback()) -> ok.
+-spec handle_request(port(), binary(), callback()) ->
+                            {'keep_alive' | 'close', binary()}.
 %% @doc: Handle a HTTP request that will possibly come on the
-%% socket. If nothing happens within the keep alive timeout, the
-%% connection is closed.
-handle_request(Socket, {Mod, Args} = Callback) ->
-    {Method, RawPath, V, B0} = get_request(Socket, Callback),     t(request_start),
-    {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),  t(headers_end),
-    RequestBody = get_body(Socket, RequestHeaders, B1, Callback), t(body_end),
+%% socket. Returns the appropriate connection token and any buffer
+%% containing (parts of) the next request.
+handle_request(Socket, PrevB, {Mod, Args} = Callback) ->
+    {Method, RawPath, V, B0} = get_request(Socket, PrevB, Callback), t(request_start),
+    {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),       t(headers_end),
+    {RequestBody, B2} = get_body(Socket, RequestHeaders, B1, Callback),   t(body_end),
 
     Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback),
 
@@ -67,14 +72,15 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             ResponseHeaders = [connection(Req, UserHeaders),
                                content_length(UserHeaders, UserBody)
                                | UserHeaders],
-            send_response(Socket, Method, ResponseCode, ResponseHeaders, UserBody, Callback),
+            send_response(Socket, Method, ResponseCode,
+                          ResponseHeaders, UserBody, Callback),
 
             t(request_end),
             Mod:handle_event(request_complete,
                              [Req, ResponseCode, ResponseHeaders, UserBody, get_timings()],
                              Args),
 
-            close_or_keepalive(Req, UserHeaders);
+            {close_or_keepalive(Req, UserHeaders), B2};
 
         {chunk, UserHeaders, Initial} ->
             t(user_end),
@@ -94,7 +100,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
             Mod:handle_event(chunk_complete,
                              [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
                              Args),
-            close;
+            {close, <<>>};
 
         {file, ResponseCode, UserHeaders, Filename} ->
             t(user_end),
@@ -109,7 +115,7 @@ handle_request(Socket, {Mod, Args} = Callback) ->
                              [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
                              Args),
 
-            close_or_keepalive(Req, UserHeaders)
+            {close_or_keepalive(Req, UserHeaders), B2}
     end.
 
 -spec mk_req(Method::http_method(), RawPath::binary(), RequestHeaders::headers(),
@@ -268,35 +274,30 @@ send_chunk(Socket, Data) ->
 %%
 
 %% @doc: Retrieves the request line
-get_request(Socket, Callback) ->
-    get_request(Socket, <<>>, Callback).
-
 get_request(Socket, Buffer, {Mod, Args} = Callback) ->
-    case gen_tcp:recv(Socket, 0, 60000) of
-        {ok, Data} ->
-            NewBuffer = <<Buffer/binary, Data/binary>>,
-            case erlang:decode_packet(http_bin, NewBuffer, []) of
-                {ok, {http_request, Method, RawPath, Version}, Rest} ->
-                    {Method, RawPath, Version, Rest};
-                {ok, {http_error, _}, _} ->
-                    Mod:handle_event(request_parse_error, [NewBuffer], Args),
-                    send_bad_request(Socket),
+    case erlang:decode_packet(http_bin, Buffer, []) of
+        {more, _} ->
+            case gen_tcp:recv(Socket, 0, 60000) of
+                {ok, Data} ->
+                    NewBuffer = <<Buffer/binary, Data/binary>>,
+                    get_request(Socket, NewBuffer, Callback);
+                {error, timeout} ->
+                    Mod:handle_event(request_timeout, [], Args),
                     gen_tcp:close(Socket),
                     exit(normal);
-                {more, _} ->
-                    get_request(Socket, NewBuffer, Callback)
+                {error, closed} ->
+                    Mod:handle_event(request_closed, [], Args),
+                    gen_tcp:close(Socket),
+                    exit(normal)
             end;
-        {error, timeout} ->
-            Mod:handle_event(request_timeout, [], Args),
-            gen_tcp:close(Socket),
-            exit(normal);
-        {error, closed} ->
-            Mod:handle_event(request_closed, [], Args),
+        {ok, {http_request, Method, RawPath, Version}, Rest} ->
+            {Method, RawPath, Version, Rest};
+        {ok, {http_error, _}, _} ->
+            Mod:handle_event(request_parse_error, [Buffer], Args),
+            send_bad_request(Socket),
             gen_tcp:close(Socket),
             exit(normal)
     end.
-
-
 
 -spec get_headers(port(), version(), binary(), callback()) ->
                          {headers(), any()}.
@@ -347,7 +348,7 @@ get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
 get_body(Socket, Headers, Buffer, {Mod, Args} = Callback) ->
     case proplists:get_value(<<"Content-Length">>, Headers, undefined) of
         undefined ->
-            <<>>;
+            {<<>>, Buffer};
         ContentLengthBin ->
             ContentLength = ?b2i(ContentLengthBin),
 
@@ -355,11 +356,11 @@ get_body(Socket, Headers, Buffer, {Mod, Args} = Callback) ->
 
             case ContentLength - byte_size(Buffer) of
                 0 ->
-                    Buffer;
+                    {Buffer, <<>>};
                 N when N > 0 ->
                     case gen_tcp:recv(Socket, N, 30000) of
                         {ok, Data} ->
-                            <<Buffer/binary, Data/binary>>;
+                            {<<Buffer/binary, Data/binary>>, <<>>};
                         {error, closed} ->
                             Mod:handle_event(client_closed, [receiving_body], Args),
                             ok = gen_tcp:close(Socket),
@@ -371,8 +372,7 @@ get_body(Socket, Headers, Buffer, {Mod, Args} = Callback) ->
                     end;
                 _ ->
                     <<Body:ContentLength/binary, Rest/binary>> = Buffer,
-                    gen_tcp:unrecv(Socket, Rest),
-                    Body
+                    {Body, Rest}
             end
     end.
 

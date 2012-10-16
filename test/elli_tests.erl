@@ -18,12 +18,15 @@ elli_test_() ->
       ?_test(get_args()),
       ?_test(post_args()),
       ?_test(shorthand()),
-      ?_test(bad_request()),
+      ?_test(too_many_headers()),
+      ?_test(too_big_body()),
+      ?_test(bad_request_line()),
       ?_test(content_length()),
       ?_test(chunked()),
       ?_test(sendfile()),
       ?_test(slow_client()),
-      ?_test(pipeline()),
+      ?_test(post_pipeline()),
+      ?_test(get_pipeline()),
       ?_test(head()),
       ?_test(no_body())
      ]}.
@@ -120,18 +123,26 @@ shorthand() ->
     ?assertEqual("hello", body(Response)).
 
 
-bad_request() ->
+too_many_headers() ->
     Headers = lists:duplicate(100, {"X-Foo", "Bar"}),
     ?assertEqual({error, socket_closed_remotely},
                  httpc:request(get, {"http://localhost:3001/foo", Headers},
-                               [], [])),
+                               [], [])).
 
+too_big_body() ->
     Body = binary:copy(<<"x">>, 1024 * 1000),
     ?assertEqual({error, socket_closed_remotely},
                  httpc:request(post,
                                {"http://localhost:3001/foo", [], [], Body},
                                [], [])).
 
+bad_request_line() ->
+    {ok, Socket} = gen_tcp:connect("127.0.0.1", 3001, [{active, false}, binary]),
+
+    Req = <<"FOO BAR /hello HTTP/1.1\r\n">>,
+    gen_tcp:send(Socket, <<Req/binary, Req/binary>>),
+
+    ?assertEqual({ok, <<"HTTP/1.1 400 Bad Request\r\n">>}, gen_tcp:recv(Socket, 0)).
 
 
 content_length() ->
@@ -184,13 +195,15 @@ slow_client() ->
                  gen_tcp:recv(Client, 0)).
 
 
-pipeline() ->
-    Body = <<"name=quux">>,
-    Headers = <<"Content-Length: ",(?i2b(size(Body)))/binary, "\r\n\r\n">>,
+post_pipeline() ->
+    Body = <<"name=elli">>,
+    Headers = <<"Content-Length: ",(?i2b(size(Body)))/binary, "\r\n",
+                "Content-Type: application/x-www-form-urlencoded", "\r\n",
+                "\r\n">>,
 
     {ok, Socket} = gen_tcp:connect("127.0.0.1", 3001, [{active, false}, binary]),
 
-    Req = <<"GET /hello?name=elli HTTP/1.1\r\n",
+    Req = <<"POST /hello HTTP/1.1\r\n",
             Headers/binary,
             Body/binary>>,
 
@@ -208,6 +221,25 @@ pipeline() ->
         orelse error_logger:info_msg(
                  "expected: ~p~ngot: ~p~n",
                  [ExpectedResponse, Res]),
+
+    ?assertEqual(binary:copy(ExpectedResponse, 2),
+                 Res).
+
+get_pipeline() ->
+    Headers = <<"User-Agent: sloow\r\n\r\n">>,
+    Req = <<"GET /hello?name=elli HTTP/1.1\r\n",
+            Headers/binary>>,
+
+    {ok, Socket} = gen_tcp:connect("127.0.0.1", 3001, [{active, false}, binary]),
+    gen_tcp:send(Socket, <<Req/binary, Req/binary>>),
+
+    {ok, Res} = gen_tcp:recv(Socket, 0),
+
+    ExpectedResponse = <<"HTTP/1.1 200 OK\r\n"
+                         "Connection: Keep-Alive\r\n"
+                         "Content-Length: 10\r\n"
+                         "\r\n"
+                         "Hello elli">>,
 
     ?assertEqual(binary:copy(ExpectedResponse, 2),
                  Res).
