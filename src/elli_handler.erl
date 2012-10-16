@@ -1,8 +1,15 @@
 -module(elli_handler).
 -include("elli.hrl").
 
--export([behaviour_info/1]).
+-callback handle(Req :: record(req), CallBackArgs :: callback_args()) ->
+    {Code, body()} |
+    {Code, headers(), RespBody} |
+    {chunk, headers()} |
+    {chunk, headers(), Initial}
+        when Code :: ok | response_code(),
+             RespBody :: {file, file:name()} | body(),
+             Initial :: body().
 
-behaviour_info(callbacks) ->
-    [{handle, 2},
-     {handle_event, 3}].
+-callback handle_event(Event :: atom(), EventInfo :: list(),
+                       CallBackArgs :: callback_args()) ->
+    any().
