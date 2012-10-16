@@ -380,7 +380,7 @@ ensure_binary(Bin) when is_binary(Bin) -> Bin;
 ensure_binary(Atom) when is_atom(Atom) -> atom_to_binary(Atom, latin1).
 
 
-check_max_size(_, ContentLength, _) when ContentLength < 102400 ->
+check_max_size(_, ContentLength, _) when ContentLength < 1024000 ->
     ok;
 check_max_size(Socket, N, {Mod, Args}) ->
     Mod:handle_event(bad_request, [{body_size, N}], Args),
