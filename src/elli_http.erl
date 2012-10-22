@@ -32,9 +32,9 @@ accept(Server, ListenSocket, Options, Callback) ->
             gen_server:cast(Server, accepted),
             ?MODULE:keepalive_loop(Socket, Options, Callback);
         {error, timeout} ->
-            ?MODULE:accept(Server, ListenSocket, Callback);
+            ?MODULE:accept(Server, ListenSocket, Options, Callback);
         {error, econnaborted} ->
-            ?MODULE:accept(Server, ListenSocket, Callback);
+            ?MODULE:accept(Server, ListenSocket, Options, Callback);
         {error, closed} ->
             ok;
         {error, Other} ->
