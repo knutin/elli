@@ -1,6 +1,6 @@
 # elli - Erlang web server for HTTP APIs
 
-[[https://secure.travis-ci.org/knutin/elli.png]]
+![Travis CI](https://secure.travis-ci.org/knutin/elli.png)
 
 Elli is a webserver you can run inside your Erlang application to
 expose an HTTP API. Elli is a aimed exclusively at building
@@ -9,6 +9,40 @@ is more important than general purpose features, then `elli` might be
 for you.
 
 Elli is used in production at Wooga.
+
+## Features
+
+Here's the features Elli *does* have:
+
+ * Rack-style request-response allowing "middlewares" to implement
+   useful features like compression, encoding, stats
+
+ * Short-circuiting of responses with `throw`
+
+ * Many acceptors waiting for a client, handling the lifecycle of that
+   connection, everything including the user code runs in one process
+   to reduce overhead
+
+ * Binaries everywhere for strings, response may be iolist
+
+ * Instrumentation with user callbacks for events like client
+   unexpectedly closed connection, request completed with timing
+   details
+
+ * Keep alive
+
+ * Chunked transfer in responses for real-time push to clients
+
+ * Pipelining
+
+
+## Extensions
+
+ * Access log: https://github.com/wooga/elli_access_log
+ * Real-time statistics dashboard: https://github.com/knutin/elli_stats
+ * Basic auth: https://github.com/martinrehfeld/elli_basicauth
+ * Static content: https://github.com/chrisavl/elli_fileserve
+ * "Date" header: https://github.com/knutin/elli_date
 
 
 ## About
@@ -170,10 +204,4 @@ init([]) ->
 ```
 
 
-## Extensions
-
- * Access log: https://github.com/wooga/elli_access_log
- * Real-time statistics dashboard: https://github.com/knutin/elli_stats
- * Basic auth: https://github.com/martinrehfeld/elli_basicauth
- * Static content: https://github.com/chrisavl/elli_fileserve
- * "Date" header: https://github.com/knutin/elli_date
+k
