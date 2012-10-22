@@ -162,7 +162,7 @@ chunked() ->
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   %% httpc adds a content-length, even though elli
-                  %% does not send any for chunked trasnfers
+                  %% does not send any for chunked transfers
                   {"content-length", integer_to_list(length(Expected))},
                   {"content-type", "text/event-stream"}], headers(Response)),
     ?assertEqual(Expected, body(Response)).
