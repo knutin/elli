@@ -63,12 +63,23 @@ init([Opts]) ->
     %% they exit
     process_flag(trap_exit, true),
 
+    Callback       = required_opt(callback, Opts),
+    CallbackArgs   = proplists:get_value(callback_args, Opts),
+    IPAddress      = proplists:get_value(ip, Opts, {0,0,0,0}),
+    Port           = proplists:get_value(port, Opts, 8080),
+    MinAcceptors   = proplists:get_value(min_acceptors, Opts, 20),
 
-    Callback = required_opt(callback, Opts),
-    CallbackArgs = proplists:get_value(callback_args, Opts),
-    IPAddress = proplists:get_value(ip, Opts, {0,0,0,0}),
-    Port = proplists:get_value(port, Opts, 8080),
-    MinAcceptors = proplists:get_value(min_acceptors, Opts, 20),
+    AcceptTimeout  = proplists:get_value(accept_timeout, Opts, 10000),
+    RequestTimeout = proplists:get_value(request_timeout, Opts, 60000),
+    HeaderTimeout  = proplists:get_value(header_timeout, Opts, 10000),
+    BodyTimeout    = proplists:get_value(body_timeout, Opts, 30000),
+    MaxBodySize    = proplists:get_value(max_body_size, Opts, 1024000),
+
+    Options = [{accept_timeout, AcceptTimeout},
+               {request_timeout, RequestTimeout},
+               {header_timeout, HeaderTimeout},
+               {body_timeout, BodyTimeout},
+               {max_body_size, MaxBodySize}],
 
     %% Notify the handler that we are about to start accepting
     %% requests, so it can create necessary supporting processes, ETS
@@ -82,12 +93,14 @@ init([Opts]) ->
                                          {packet, raw},
                                          {active, false}
                                         ]),
-    Acceptors = [start_acceptor(Socket, {Callback, CallbackArgs})
+    Acceptors = [elli_http:start_link(self(), Socket, Options,
+                                      {Callback, CallbackArgs})
                  || _ <- lists:seq(1, MinAcceptors)],
 
     {ok, #state{socket = Socket,
                 acceptors = Acceptors,
                 open_reqs = 0,
+                options = Options,
                 callback = {Callback, CallbackArgs}}}.
 
 
@@ -135,12 +148,10 @@ remove_acceptor(State, Pid) ->
                 open_reqs = State#state.open_reqs - 1}.
 
 start_add_acceptor(State) ->
-    Pid = start_acceptor(State#state.socket, State#state.callback),
+    Pid = elli_http:start_link(self(), State#state.socket,
+                               State#state.options, State#state.callback),
     State#state{acceptors = [Pid | State#state.acceptors],
                 open_reqs = State#state.open_reqs + 1}.
-
-start_acceptor(Socket, Callback) ->
-    elli_http:start_link(self(), Socket, Callback).
 
 
 required_opt(Name, Opts) ->

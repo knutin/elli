@@ -130,7 +130,7 @@ too_many_headers() ->
                                [], [])).
 
 too_big_body() ->
-    Body = binary:copy(<<"x">>, 1024 * 1000),
+    Body = binary:copy(<<"x">>, (1024 * 1000) + 1),
     ?assertEqual({error, socket_closed_remotely},
                  httpc:request(post,
                                {"http://localhost:3001/foo", [], [], Body},

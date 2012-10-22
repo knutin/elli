@@ -25,6 +25,7 @@
 -record(state, {socket,
                 acceptors,
                 open_reqs,
+                options,
                 callback :: callback()
 }).
 

@@ -6,27 +6,31 @@
 -module(elli_http).
 -include("../include/elli.hrl").
 
--export([start_link/3, accept/3, handle_request/3, chunk_loop/1,
-         split_args/1, parse_path/1, keepalive_loop/2, keepalive_loop/4]).
+%% API
+-export([start_link/4]).
 
 -export([mk_req/7]). %% useful when testing.
 
+%% Exported for looping with a fully-qualified module name
+-export([accept/4, handle_request/4, chunk_loop/1, split_args/1,
+         parse_path/1, keepalive_loop/3, keepalive_loop/5]).
 
--spec start_link(pid(), port(), callback()) -> pid().
-start_link(Server, ListenSocket, Callback) ->
-    spawn_link(?MODULE, accept, [Server, ListenSocket, Callback]).
 
--spec accept(pid(), port(), callback()) -> ok.
+-spec start_link(pid(), port(), proplists:proplist(), callback()) -> pid().
+start_link(Server, ListenSocket, Options, Callback) ->
+    spawn_link(?MODULE, accept, [Server, ListenSocket, Options, Callback]).
+
+-spec accept(pid(), port(), proplists:proplist(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
 %% request, then loops if we're using keep alive or chunked
 %% transfer. If accept doesn't give us a socket within 10 seconds, we
 %% loop to allow code upgrades.
-accept(Server, ListenSocket, {Mod, Args} = Callback) ->
-    case catch gen_tcp:accept(ListenSocket, 10000) of
+accept(Server, ListenSocket, Options, Callback) ->
+    case catch gen_tcp:accept(ListenSocket, accept_timeout(Options)) of
         {ok, Socket} ->
             t(accepted),
             gen_server:cast(Server, accepted),
-            ?MODULE:keepalive_loop(Socket, Callback);
+            ?MODULE:keepalive_loop(Socket, Options, Callback);
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Callback);
         {error, econnaborted} ->
@@ -40,29 +44,29 @@ accept(Server, ListenSocket, {Mod, Args} = Callback) ->
 
 %% @doc: Handle multiple requests on the same connection, ie. "keep
 %% alive".
-keepalive_loop(Socket, Callback) ->
-    keepalive_loop(Socket, 0, <<>>, Callback).
+keepalive_loop(Socket, Options, Callback) ->
+    keepalive_loop(Socket, 0, <<>>, Options, Callback).
 
-keepalive_loop(Socket, NumRequests, Buffer, Callback) ->
-    case ?MODULE:handle_request(Socket, Buffer, Callback) of
+keepalive_loop(Socket, NumRequests, Buffer, Options, Callback) ->
+    case ?MODULE:handle_request(Socket, Buffer, Options, Callback) of
         {keep_alive, NewBuffer} ->
-            ?MODULE:keepalive_loop(Socket, NumRequests, NewBuffer, Callback);
+            ?MODULE:keepalive_loop(Socket, NumRequests, NewBuffer, Options, Callback);
         {close, _} ->
             gen_tcp:close(Socket),
             ok
     end.
 
--spec handle_request(port(), binary(), callback()) ->
+-spec handle_request(port(), binary(), proplists:proplist(), callback()) ->
                             {'keep_alive' | 'close', binary()}.
 %% @doc: Handle a HTTP request that will possibly come on the
 %% socket. Returns the appropriate connection token and any buffer
 %% containing (parts of) the next request.
-handle_request(Socket, PrevB, {Mod, Args} = Callback) ->
-    {Method, RawPath, V, B0} = get_request(Socket, PrevB, Callback), t(request_start),
-    {RequestHeaders, B1} = get_headers(Socket, V, B0, Callback),       t(headers_end),
-    {RequestBody, B2} = get_body(Socket, RequestHeaders, B1, Callback),   t(body_end),
+handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
+    {Method, RawPath, V, B0} = get_request(S, PrevB, Opts, Callback), t(request_start),
+    {RequestHeaders, B1} = get_headers(S, V, B0, Opts, Callback),       t(headers_end),
+    {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback),   t(body_end),
 
-    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback),
+    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, S, Callback),
 
     t(user_start),
     case execute_callback(Req, Callback) of
@@ -72,7 +76,7 @@ handle_request(Socket, PrevB, {Mod, Args} = Callback) ->
             ResponseHeaders = [connection(Req, UserHeaders),
                                content_length(UserHeaders, UserBody)
                                | UserHeaders],
-            send_response(Socket, Method, ResponseCode,
+            send_response(S, Method, ResponseCode,
                           ResponseHeaders, UserBody, Callback),
 
             t(request_end),
@@ -88,10 +92,10 @@ handle_request(Socket, PrevB, {Mod, Args} = Callback) ->
             ResponseHeaders = [{<<"Transfer-Encoding">>, <<"chunked">>},
                                connection(Req, UserHeaders)
                                | UserHeaders],
-            send_response(Socket, Method, 200, ResponseHeaders, <<"">>, Callback),
-            Initial =:= <<"">> orelse send_chunk(Socket, Initial),
+            send_response(S, Method, 200, ResponseHeaders, <<"">>, Callback),
+            Initial =:= <<"">> orelse send_chunk(S, Initial),
 
-            ClosingEnd = case start_chunk_loop(Socket) of
+            ClosingEnd = case start_chunk_loop(S) of
                              {error, client_closed} -> client;
                              ok -> server
                          end,
@@ -107,7 +111,7 @@ handle_request(Socket, PrevB, {Mod, Args} = Callback) ->
 
             %% Handlers sending files should provide Content-Length header
             ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
-            send_file(Socket, ResponseCode, ResponseHeaders, Filename, Callback),
+            send_file(S, ResponseCode, ResponseHeaders, Filename, Callback),
 
             t(request_end),
 
@@ -274,13 +278,13 @@ send_chunk(Socket, Data) ->
 %%
 
 %% @doc: Retrieves the request line
-get_request(Socket, Buffer, {Mod, Args} = Callback) ->
+get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
     case erlang:decode_packet(http_bin, Buffer, []) of
         {more, _} ->
-            case gen_tcp:recv(Socket, 0, 60000) of
+            case gen_tcp:recv(Socket, 0, request_timeout(Options)) of
                 {ok, Data} ->
                     NewBuffer = <<Buffer/binary, Data/binary>>,
-                    get_request(Socket, NewBuffer, Callback);
+                    get_request(Socket, NewBuffer, Options, Callback);
                 {error, timeout} ->
                     Mod:handle_event(request_timeout, [], Args),
                     gen_tcp:close(Socket),
@@ -299,30 +303,31 @@ get_request(Socket, Buffer, {Mod, Args} = Callback) ->
             exit(normal)
     end.
 
--spec get_headers(port(), version(), binary(), callback()) ->
+-spec get_headers(port(), version(), binary(), proplists:proplist(), callback()) ->
                          {headers(), any()}.
-get_headers(_Socket, {0, 9}, _, _) ->
+get_headers(_Socket, {0, 9}, _, _, _) ->
     {[], <<>>};
-get_headers(Socket, {1, _}, Buffer, Callback) ->
-    get_headers(Socket, Buffer, [], 0, Callback).
+get_headers(Socket, {1, _}, Buffer, Opts, Callback) ->
+    get_headers(Socket, Buffer, [], 0, Opts, Callback).
 
-get_headers(Socket, _, Headers, HeadersCount, {Mod, Args}) when HeadersCount >= 100 ->
+get_headers(Socket, _, Headers, HeadersCount, _Opts, {Mod, Args})
+  when HeadersCount >= 100 ->
     Mod:handle_event(bad_request, [{too_many_headers, Headers}], Args),
     send_bad_request(Socket),
     gen_tcp:close(Socket),
     exit(normal);
-get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
+get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback) ->
     case erlang:decode_packet(httph_bin, Buffer, []) of
         {ok, {http_header, _, Key, _, Value}, Rest} ->
             NewHeaders = [{ensure_binary(Key), Value} | Headers],
-            get_headers(Socket, Rest, NewHeaders, HeadersCount + 1, Callback);
+            get_headers(Socket, Rest, NewHeaders, HeadersCount + 1, Opts, Callback);
         {ok, http_eoh, Rest} ->
             {Headers, Rest};
         {more, _} ->
-            case gen_tcp:recv(Socket, 0, 10000) of
+            case gen_tcp:recv(Socket, 0, header_timeout(Opts)) of
                 {ok, Data} ->
                     get_headers(Socket, <<Buffer/binary, Data/binary>>,
-                                Headers, HeadersCount, Callback);
+                                Headers, HeadersCount, Opts, Callback);
                 {error, closed} ->
                     Mod:handle_event(client_closed, [receiving_headers], Args),
                     gen_tcp:close(Socket),
@@ -334,7 +339,8 @@ get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
             end
     end.
 
--spec get_body(port(), headers(), binary(), callback()) -> body().
+-spec get_body(port(), headers(), binary(),
+               proplists:proplist(), callback()) -> body().
 %% @doc: Fetches the full body of the request, if any is available.
 %%
 %% At the moment we don't need to handle large requests, so there is
@@ -345,20 +351,20 @@ get_headers(Socket, Buffer, Headers, HeadersCount, {Mod, Args} = Callback) ->
 %% As we are always receiving whatever the client sends, we might have
 %% buffered too much and get parts of the next pipelined request. In
 %% that case, push it back in the buffer and handle the first request.
-get_body(Socket, Headers, Buffer, {Mod, Args} = Callback) ->
+get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
     case proplists:get_value(<<"Content-Length">>, Headers, undefined) of
         undefined ->
             {<<>>, Buffer};
         ContentLengthBin ->
             ContentLength = ?b2i(ContentLengthBin),
 
-            ok = check_max_size(Socket, ContentLength, Callback),
+            ok = check_max_size(Socket, ContentLength, Opts, Callback),
 
             case ContentLength - byte_size(Buffer) of
                 0 ->
                     {Buffer, <<>>};
                 N when N > 0 ->
-                    case gen_tcp:recv(Socket, N, 30000) of
+                    case gen_tcp:recv(Socket, N, body_timeout(Opts)) of
                         {ok, Data} ->
                             {<<Buffer/binary, Data/binary>>, <<>>};
                         {error, closed} ->
@@ -381,12 +387,15 @@ ensure_binary(Bin) when is_binary(Bin) -> Bin;
 ensure_binary(Atom) when is_atom(Atom) -> atom_to_binary(Atom, latin1).
 
 
-check_max_size(_, ContentLength, _) when ContentLength < 1024000 ->
-    ok;
-check_max_size(Socket, N, {Mod, Args}) ->
-    Mod:handle_event(bad_request, [{body_size, N}], Args),
-    gen_tcp:close(Socket),
-    exit(normal).
+check_max_size(Socket, ContentLength, Opts, {Mod, Args}) ->
+    case ContentLength > max_body_size(Opts) of
+        true ->
+            Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),
+            gen_tcp:close(Socket),
+            exit(normal);
+        false ->
+            ok
+    end.
 
 
 %%
@@ -505,7 +514,20 @@ get_timings() ->
                  end, get()).
 
 
+%%
+%% OPTIONS
+%%
 
+accept_timeout(Opts)  -> proplists:get_value(accept_timeout, Opts).
+request_timeout(Opts) -> proplists:get_value(request_timeout, Opts).
+header_timeout(Opts)  -> proplists:get_value(header_timeout, Opts).
+body_timeout(Opts)    -> proplists:get_value(body_timeout, Opts).
+max_body_size(Opts)   -> proplists:get_value(max_body_size, Opts).
+
+
+%%
+%% HTTP STATUS CODES
+%%
 
 %% @doc: Response code string. Lifted from cowboy_http_req.erl
 status(100) -> <<"100 Continue">>;
