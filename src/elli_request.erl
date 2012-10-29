@@ -66,6 +66,8 @@ body_qs(#req{body = Body} = Req) ->
     case get_header(<<"Content-Type">>, Req) of
         <<"application/x-www-form-urlencoded">> ->
             elli_http:split_args(Body);
+        <<"application/x-www-form-urlencoded;", _/binary>> -> % ; charset=...
+            elli_http:split_args(Body);
         _ ->
             erlang:error(badarg)
     end.
