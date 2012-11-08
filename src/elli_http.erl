@@ -524,12 +524,12 @@ get_range(RequestHeaders, Size)  ->
 parse_range(<<$b,$y,$t,$e,$s,$=,$-, SuffixBin/binary>>, Size) ->
     %% make sure the dash is not an invalid negative sign.
     case binary:matches(SuffixBin, <<"-">>) of
-	[] ->
-	    %% suffix-byte-range
-	    SuffixLength = ?b2i(SuffixBin),
-	    parse_range({erlang:max(Size - SuffixLength, 0), SuffixLength}, Size);
-	_ -> invalid
-    end;	    
+        [] ->
+            %% suffix-byte-range
+            SuffixLength = ?b2i(SuffixBin),
+            parse_range({erlang:max(Size - SuffixLength, 0), SuffixLength}, Size);
+        _ -> invalid
+    end;            
 parse_range(<<$b,$y,$t,$e,$s,$=, ByteRange/binary>>, Size) ->
     case binary:split(ByteRange, <<"-">>, [global]) of
         %% byte-range without last-byte-pos
