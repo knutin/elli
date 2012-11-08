@@ -23,7 +23,6 @@ elli_test_() ->
       ?_test(bad_request_line()),
       ?_test(content_length()),
       ?_test(chunked()),
-      ?_test(sendfile()),
       ?_test(slow_client()),
       ?_test(post_pipeline()),
       ?_test(get_pipeline()),
@@ -166,17 +165,6 @@ chunked() ->
                   {"content-length", integer_to_list(length(Expected))},
                   {"content-type", "text/event-stream"}], headers(Response)),
     ?assertEqual(Expected, body(Response)).
-
-sendfile() ->
-    {ok, Response} = httpc:request("http://localhost:3001/sendfile"),
-
-    F = "../src/elli_example_callback.erl",
-    {ok, Expected} = file:read_file(F),
-
-    ?assertEqual([{"connection", "Keep-Alive"},
-                  {"content-length", integer_to_list(size(Expected))}],
-                 headers(Response)),
-    ?assertEqual(binary_to_list(Expected), body(Response)).
 
 
 slow_client() ->
