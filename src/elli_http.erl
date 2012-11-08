@@ -236,12 +236,15 @@ send_bad_request(Socket) ->
 %% response.
 execute_callback(Req, {Mod, Args}) ->
     try Mod:handle(Req, Args) of
-        {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename};
-        {ok, Headers, Body}                   -> {response, 200, Headers, Body};
+        {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename, []};
+        {ok, Headers, {file, Filename, Opts}} -> {file, 200, Headers, Filename, Opts};
+	{ok, Headers, Body}                   -> {response, 200, Headers, Body};
         {ok, Body}                            -> {response, 200, [], Body};
         {chunk, Headers}                      -> {chunk, Headers, <<"">>};
         {chunk, Headers, Initial}             -> {chunk, Headers, Initial};
         {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename};
+        {HttpCode, Headers, {file, Filename, Opts}} ->
+	                                         {file, HttpCode, Headers, Filename, Opts};
         {HttpCode, Headers, Body}             -> {response, HttpCode, Headers, Body};
         {HttpCode, Body}                      -> {response, HttpCode, [], Body}
     catch
