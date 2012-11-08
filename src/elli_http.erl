@@ -242,7 +242,7 @@ execute_callback(Req, {Mod, Args}) ->
         {ok, Body}                            -> {response, 200, [], Body};
         {chunk, Headers}                      -> {chunk, Headers, <<"">>};
         {chunk, Headers, Initial}             -> {chunk, Headers, Initial};
-        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename};
+        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename, []};
         {HttpCode, Headers, {file, Filename, Opts}} ->
                                                  {file, HttpCode, Headers, Filename, Opts};
         {HttpCode, Headers, Body}             -> {response, HttpCode, Headers, Body};
