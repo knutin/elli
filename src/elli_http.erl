@@ -227,8 +227,8 @@ send_file(_, _, _, invalid) ->
 
 get_size(Filename) ->
     case file:read_file_info(Filename) of
-	{ok, #file_info{size = Size}} -> Size;
-	_ -> 0
+        {ok, #file_info{size = Size}} -> Size;
+        _ -> 0
     end.
 
 send_bad_request(Socket) ->
