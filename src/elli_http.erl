@@ -176,7 +176,7 @@ send_file(Socket, RequestHeaders, Code, Headers, Filename, Opts, {Mod, Args}) ->
 	   end,
     Range = case proplists:get_value(range, Opts) of
 		undefined -> get_range(RequestHeaders, Size);
-		Range0    -> oeps
+		Range0    -> Range0
 	    end,
     Headers0 = set_range_and_length(Range, Size, Headers),
     %% Rewrite status code when a (in)valid range is present.
