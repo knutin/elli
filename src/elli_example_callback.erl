@@ -90,14 +90,31 @@ handle('GET', [<<"crash">>], _Req) ->
 
 handle('GET', [<<"sendfile">>], _Req) ->
     %% Returning {file, "/path/to/file"} instead of the body results
-    %% in Elli using sendfile. In the name of performance, Elli
-    %% requires you to specify the Content-Length header, since you
-    %% probably already stated the file to check if it exists.
+    %% in Elli using sendfile.
 
-    F = "../src/elli_example_callback.erl",
+    F = "../README.md",
+
+    {200, [], {file, F, []}};
+
+handle('GET', [<<"sendfile">>, <<"range">>], _Req) ->
+    %% Returns the next 400 bytes of the file,
+    %% starting at an offset of 300.
+    F = "../README.md",
+
+    {200, [], {file, F, [{range, {300, 400}}]}};
+
+handle('GET', [<<"sendfile">>, <<"size">>], _Req) ->
+    %% Returns the the entire file, by explicitly setting
+    %% the size. Using this option bypasses checks for
+    %% file existence and size, so use appropriately.
+    F = "../README.md",
     {ok, #file_info{size = Size}} = file:read_file_info(F),
+    {200, [], {file, F, [{size, Size}]}};
 
-    {200, [{<<"Content-Length">>, Size}], {file, F}};
+handle('GET', [<<"sendfile">>, <<"size-0">>], _Req) ->
+    %% Returns a 204, by setting size to 0.
+    F = "../README.md",
+    {200, [], {file, F, [{size, 0}]}};
 
 handle('GET', [<<"compressed">>], _Req) ->
     %% Body with a byte size over 1024 are automatically gzipped by
