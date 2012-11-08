@@ -6,6 +6,8 @@
 -module(elli_http).
 -include("../include/elli.hrl").
 
+-include_lib("kernel/include/file.hrl").
+
 %% API
 -export([start_link/4]).
 
@@ -106,12 +108,11 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
                              Args),
             {close, <<>>};
 
-        {file, ResponseCode, UserHeaders, Filename} ->
+        {file, ResponseCode, UserHeaders, Filename, FileOpts} ->
             t(user_end),
 
-            %% Handlers sending files should provide Content-Length header
             ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
-            send_file(S, ResponseCode, ResponseHeaders, Filename, Callback),
+            send_file(S, RequestHeaders, ResponseCode, ResponseHeaders, Filename, FileOpts, Callback),
 
             t(request_end),
 
@@ -162,23 +163,69 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
     end.
 
 
-%% @doc: Generates and sends a HTTP response to the client where the body
-%% is the contents of the given file.
-send_file(Socket, Code, Headers, Filename, {Mod, Args}) ->
-    ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
-                       encode_headers(Headers), <<"\r\n">>],
+-spec send_file(Socket::inet:socket(), RequestHeaders::headers(),
+		Code::response_code(), Headers::headers(), Filename::file:filename(),
+		Opts::proplists:proplist(), Callback::callback()) -> ok.
 
+%% @doc: Generates and sends a HTTP response to the client where the body
+%% is the contents of the given file. Supports single byte-range requests.
+send_file(Socket, RequestHeaders, Code, Headers, Filename, Opts, {Mod, Args}) ->
+    Size = case proplists:get_value(size, Opts) of
+	       undefined -> get_size(Filename);
+	       Size0     -> Size0
+	   end,
+    Range = case proplists:get_value(range, Opts) of
+		undefined -> get_range(RequestHeaders, Size);
+		Range0    -> oeps
+	    end,
+    Headers0 = set_range_and_length(Range, Size, Headers),
+    %% Rewrite status code when a (in)valid range is present.
+    Code0 = case Range of
+		undefined -> Code;
+		{_,_}     -> 206;
+		invalid   -> 416
+	    end,
+
+    ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code0), <<"\r\n">>,
+		       encode_headers(Headers0), <<"\r\n">>],
     case gen_tcp:send(Socket, ResponseHeaders) of
-        ok ->
-            case file:sendfile(Filename, Socket) of
-                {ok, _BytesSent} -> ok;
-                {error, closed} ->
-                    Mod:handle_event(client_closed, [before_response], Args),
-                    ok
-            end;
-        {error, closed} ->
-            Mod:handle_event(client_closed, [before_response], Args),
-            ok
+	ok ->
+	    case send_file(Socket, Filename, Range) of
+		{ok, _BytesSent} -> ok;
+		{error, closed} ->
+		    Mod:handle_event(client_closed, [before_response], Args),
+		    ok;
+		{error, invalid_range} ->
+		    Mod:handle_event(requested_range_not_satisfiable, [], Args),
+		    ok
+	    end;
+	{error, closed} ->
+	    Mod:handle_event(client_closed, [before_response], Args),
+	    ok
+    end.
+
+send_file(Socket, Filename, {Offset, Bytes}) ->
+    case file:open(Filename, [read, raw, binary]) of
+	{ok, Fd} ->
+	    Res = file:sendfile(Fd, Socket, Offset, Bytes, []),
+	    file:close(Fd),
+	    Res;
+	{error, Reason} ->
+	    {error, Reason}
+    end;
+%% When range is undefined, set both offset and bytes to 0,
+%% which sends the entire file.
+%% (see file:sendfile/5 documentation)
+send_file(Socket, Filename, undefined) ->
+    send_file(Socket, Filename, {0, 0});
+%% Don't send file when range is invalid.
+send_file(_, _, invalid) ->
+    {error, invalid_range}.
+
+get_size(Filename) ->
+    case file:read_file_info(Filename) of
+	{ok, #file_info{size = Size}} -> Size;
+	_ -> 0
     end.
 
 send_bad_request(Socket) ->
@@ -458,6 +505,72 @@ content_length(Headers, Body)->
         ContentLength ->
             {<<"Content-Length">>, ContentLength}
     end.
+
+-spec get_range(RequestHeaders::headers(),
+		Size::non_neg_integer()) -> byte_range().
+
+%% @doc: Parses the Range header from the request, if present,
+%% as defined in rfc2616-14.35.1. At the moment only
+%% single byte-range requests are supported.
+get_range(RequestHeaders, Size)  ->
+    parse_range(proplists:get_value(<<"Range">>, RequestHeaders), Size).
+
+parse_range(<<$b,$y,$t,$e,$s,$=,$-, SuffixBin/binary>>, Size) ->
+    %% suffix-byte-range
+    SuffixLength = ?b2i(SuffixBin),
+    parse_range({erlang:max(Size - SuffixLength, 0), SuffixLength}, Size);
+parse_range(<<$b,$y,$t,$e,$s,$=, ByteRange/binary>>, Size) ->
+    case binary:split(ByteRange, <<"-">>) of
+	%% byte-range without last-byte-pos
+	[FirstBytePosBin, <<>>] ->
+	    parse_range({?b2i(FirstBytePosBin), Size}, Size);
+	%% full byte-range
+	[FirstBytePosBin, LastBytePosBin] ->
+	    First = ?b2i(FirstBytePosBin),
+	    Last = ?b2i(LastBytePosBin),
+	    parse_range({First, Last - First + 1}, Size);
+	_ -> invalid
+    end;
+parse_range({Offset, Length}, Size)
+  when Offset < 0; Offset >= Size; Length =< 0; Size =< 0 -> invalid;
+parse_range({Offset, Length}, Size)
+  when Length > Size - Offset -> {Offset, Size - Offset};
+parse_range({Offset, Length}, _) -> {Offset, Length};
+parse_range(undefined, _) -> undefined;
+parse_range(_, _) -> invalid.
+
+-spec set_content_range(Range::byte_range(), Size::non_neg_integer(),
+			Headers::headers()) -> headers().
+
+set_content_range(undefined, _, Headers) ->
+    Headers;
+set_content_range(Range, Size, Headers) ->
+    lists:keystore(<<"Content-Range">>, 1, Headers,
+		   {<<"Content-Range">>,
+		    [<<"bytes ">>, set_content_range_bytes(Range),
+		     <<"/">>, ?i2l(Size)]}).
+
+set_content_range_bytes({Offset, Length}) ->
+    [?i2l(Offset), <<"-">>, ?i2l(Offset + Length - 1)];
+set_content_range_bytes(invalid) -> <<"*">>.
+
+-spec set_content_length(Range::byte_range(), Size::non_neg_integer(),
+			 Headers::headers()) -> headers().
+
+set_content_length({_, Length}, _, Headers) ->
+    lists:keystore(<<"Content-Length">>, 1, Headers,
+		   {<<"Content-Length">>, Length});
+set_content_length(undefined, Size, Headers) ->
+    set_content_length({0, Size}, Size, Headers);
+set_content_length(invalid, Size, Headers) ->
+    set_content_length({0,0}, Size, Headers).
+
+-spec set_range_and_length(Range::byte_range(), Size::non_neg_integer(),
+			   Headers::headers()) -> headers().
+
+set_range_and_length(Range, Size, Headers) ->
+    set_content_length(Range, Size, set_content_range(Range, Size, Headers)).
+
 
 %%
 %% PATH HELPERS
