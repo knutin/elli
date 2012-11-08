@@ -101,7 +101,7 @@ handle('GET', [<<"sendfile">>, <<"range">>], _Req) ->
     %% starting at an offset of 300.
     F = "../README.md",
 
-    {200, [], {file, F, [{range, {300, 400}}]}};
+    {200, [], {file, F, [{range, {300, 699}}]}};
 
 handle('GET', [<<"sendfile">>, <<"size">>], _Req) ->
     %% Returns the the entire file, by explicitly setting

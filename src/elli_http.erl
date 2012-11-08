@@ -205,22 +205,22 @@ send_file(Socket, RequestHeaders, Code, Headers, Filename, Opts, {Mod, Args}) ->
             ok
     end.
 
-%% Makes passing a length of 0 a no-op.
+%% Makes passing a size of 0 a no-op.
 %% The default behaviour of file:send_file/5 makes
 %% passing a length of 0 sending the complete file.
-send_file(_, _, _, {_, 0}) ->
+send_file(_, _, 0, _) ->
     {ok, 0};
-send_file(Socket, Filename, _, {Offset, Bytes}) ->
+send_file(Socket, Filename, _, {First, Last}) ->
     case file:open(Filename, [read, raw, binary]) of
         {ok, Fd} ->
-            Res = file:sendfile(Fd, Socket, Offset, Bytes, []),
+            Res = file:sendfile(Fd, Socket, First, Last - First + 1, []),
             file:close(Fd),
             Res;
         {error, Reason} ->
             {error, Reason}
     end;
 send_file(Socket, Filename, Size, undefined) ->
-    send_file(Socket, Filename, Size, {0, Size});
+    send_file(Socket, Filename, Size, {0, Size - 1});
 %% Don't send file when range is invalid.
 send_file(_, _, _, invalid) ->
     {error, invalid_range}.
@@ -527,7 +527,8 @@ parse_range(<<$b,$y,$t,$e,$s,$=,$-, SuffixBin/binary>>, Size) ->
         [] ->
             %% suffix-byte-range
             SuffixLength = ?b2i(SuffixBin),
-            parse_range({erlang:max(Size - SuffixLength, 0), SuffixLength}, Size);
+            First = erlang:max(Size - SuffixLength, 0),
+            parse_range({First, First + SuffixLength - 1}, Size);
         _ -> invalid
     end;            
 parse_range(<<$b,$y,$t,$e,$s,$=, ByteRange/binary>>, Size) ->
@@ -539,14 +540,14 @@ parse_range(<<$b,$y,$t,$e,$s,$=, ByteRange/binary>>, Size) ->
         [FirstBytePosBin, LastBytePosBin] ->
             First = ?b2i(FirstBytePosBin),
             Last = ?b2i(LastBytePosBin),
-            parse_range({First, Last - First + 1}, Size);
+            parse_range({First, Last}, Size);
         _ -> invalid
     end;
-parse_range({Offset, Length}, Size)
-  when Offset < 0; Offset >= Size; Length =< 0; Size =< 0 -> invalid;
-parse_range({Offset, Length}, Size)
-  when Length > Size - Offset -> {Offset, Size - Offset};
-parse_range({Offset, Length}, _) -> {Offset, Length};
+parse_range({First, Last}, Size)
+  when First < 0; First >= Size; First > Last; Size =< 0 -> invalid;
+parse_range({First, Last}, Size)
+  when Last >= Size -> {First, Size - 1};
+parse_range({First, Last}, _) -> {First, Last};
 parse_range(undefined, _) -> undefined;
 parse_range(_, _) -> invalid.
 
@@ -561,20 +562,20 @@ set_content_range(Range, Size, Headers) ->
                     [<<"bytes ">>, set_content_range_bytes(Range),
                      <<"/">>, ?i2l(Size)]}).
 
-set_content_range_bytes({Offset, Length}) ->
-    [?i2l(Offset), <<"-">>, ?i2l(Offset + Length - 1)];
+set_content_range_bytes({First, Last}) ->
+    [?i2l(First), <<"-">>, ?i2l(Last)];
 set_content_range_bytes(invalid) -> <<"*">>.
 
 -spec set_content_length(Range::byte_range(), Size::non_neg_integer(),
                          Headers::headers()) -> headers().
 
-set_content_length({_, Length}, _, Headers) ->
-    lists:keystore(<<"Content-Length">>, 1, Headers,
-                   {<<"Content-Length">>, Length});
 set_content_length(undefined, Size, Headers) ->
-    set_content_length({0, Size}, Size, Headers);
-set_content_length(invalid, Size, Headers) ->
-    set_content_length({0,0}, Size, Headers).
+    lists:keystore(<<"Content-Length">>, 1, Headers,
+                   {<<"Content-Length">>, Size});
+set_content_length({First, Last}, _, Headers) ->
+    set_content_length(undefined, Last - First + 1, Headers);
+set_content_length(invalid, _, Headers) ->
+    set_content_length(undefined, 0, Headers).
 
 -spec set_range_and_length(Range::byte_range(), Size::non_neg_integer(),
                            Headers::headers()) -> headers().

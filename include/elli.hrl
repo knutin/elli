@@ -15,8 +15,8 @@
 -type response_code() :: 100..999.
 -type connection_token_atom() :: keep_alive | close.
 
--type byte_range() :: {Offset::non_neg_integer(), Length::non_neg_integer()} |
-		      undefined | invalid.
+-type byte_range() :: {First::non_neg_integer(), Last::non_neg_integer()} |
+                      undefined | invalid.
 
 -define(l2i(L), list_to_integer(L)).
 -define(i2l(I), integer_to_list(I)).
