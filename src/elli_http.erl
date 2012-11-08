@@ -528,7 +528,7 @@ parse_range(<<$b,$y,$t,$e,$s,$=,$-, SuffixBin/binary>>, Size) ->
 	_ -> invalid
     end;	    
 parse_range(<<$b,$y,$t,$e,$s,$=, ByteRange/binary>>, Size) ->
-    case binary:split(ByteRange, <<"-">>) of
+    case binary:split(ByteRange, <<"-">>, [global]) of
         %% byte-range without last-byte-pos
         [FirstBytePosBin, <<>>] ->
             parse_range({?b2i(FirstBytePosBin), Size}, Size);
