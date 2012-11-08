@@ -181,6 +181,7 @@ send_file(Socket, RequestHeaders, Code, Headers, Filename, Opts, {Mod, Args}) ->
     Headers0 = set_range_and_length(Range, Size, Headers),
     %% Rewrite status code when a (in)valid range is present.
     Code0 = case Range of
+                undefined when Size =:= 0, Code =:= 200 -> 204;
                 undefined -> Code;
                 {_,_}     -> 206;
                 invalid   -> 416
@@ -190,7 +191,7 @@ send_file(Socket, RequestHeaders, Code, Headers, Filename, Opts, {Mod, Args}) ->
                        encode_headers(Headers0), <<"\r\n">>],
     case gen_tcp:send(Socket, ResponseHeaders) of
         ok ->
-            case send_file(Socket, Filename, Range) of
+            case send_file(Socket, Filename, Size, Range) of
                 {ok, _BytesSent} -> ok;
                 {error, closed} ->
                     Mod:handle_event(client_closed, [before_response], Args),
@@ -204,7 +205,12 @@ send_file(Socket, RequestHeaders, Code, Headers, Filename, Opts, {Mod, Args}) ->
             ok
     end.
 
-send_file(Socket, Filename, {Offset, Bytes}) ->
+%% Makes passing a length of 0 a no-op.
+%% The default behaviour of file:send_file/5 makes
+%% passing a length of 0 sending the complete file.
+send_file(_, _, _, {_, 0}) ->
+    {ok, 0};
+send_file(Socket, Filename, _, {Offset, Bytes}) ->
     case file:open(Filename, [read, raw, binary]) of
         {ok, Fd} ->
             Res = file:sendfile(Fd, Socket, Offset, Bytes, []),
@@ -213,13 +219,10 @@ send_file(Socket, Filename, {Offset, Bytes}) ->
         {error, Reason} ->
             {error, Reason}
     end;
-%% When range is undefined, set both offset and bytes to 0,
-%% which sends the entire file.
-%% (see file:sendfile/5 documentation)
-send_file(Socket, Filename, undefined) ->
-    send_file(Socket, Filename, {0, 0});
+send_file(Socket, Filename, Size, undefined) ->
+    send_file(Socket, Filename, Size, {0, Size});
 %% Don't send file when range is invalid.
-send_file(_, _, invalid) ->
+send_file(_, _, _, invalid) ->
     {error, invalid_range}.
 
 get_size(Filename) ->
