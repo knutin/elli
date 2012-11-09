@@ -111,8 +111,12 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
         {file, ResponseCode, UserHeaders, Filename, FileOpts} ->
             t(user_end),
 
-            ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
-            send_file(S, RequestHeaders, ResponseCode, ResponseHeaders, Filename, FileOpts, Callback),
+            {NewResponseCode, ResponseHeaders, NewFileOpts} =
+                prepare_send_file(RequestHeaders, ResponseCode,
+                                  [connection(Req, UserHeaders) | UserHeaders],
+                                  Filename, FileOpts),
+            
+            send_file(S, NewResponseCode, ResponseHeaders, Filename, NewFileOpts, Callback),
 
             t(request_end),
 
@@ -163,32 +167,57 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
     end.
 
 
--spec send_file(Socket::inet:socket(), RequestHeaders::headers(),
-                Code::response_code(), Headers::headers(), Filename::file:filename(),
-                Opts::proplists:proplist(), Callback::callback()) -> ok.
+-spec prepare_send_file(RequestHeaders::headers(),
+                        Code::response_code(), Headers::headers(),
+                        Filename::file:filename(), FileOpts::file_opts()) ->
+                               {NewCode::response_code(),
+                                NewHeaders::headers(),
+                                NewFileOpts::file_opts()}.
 
-%% @doc: Generates and sends a HTTP response to the client where the body
-%% is the contents of the given file. Supports single byte-range requests.
-send_file(Socket, RequestHeaders, Code, Headers, Filename, Opts, {Mod, Args}) ->
-    Size = case proplists:get_value(size, Opts) of
+%% @doc: Prepares a HTTP response and calculates size/range info.
+%% Supports single byte-range requests.
+prepare_send_file(RequestHeaders, Code, Headers, Filename, FileOpts) ->
+    Size = case proplists:get_value(size, FileOpts) of
                undefined -> get_size(Filename);
                Size0     -> Size0
            end,
-    Range = case proplists:get_value(range, Opts) of
+    Range = case proplists:get_value(range, FileOpts) of
                 undefined -> get_range(RequestHeaders, Size);
                 Range0    -> Range0
             end,
-    Headers0 = set_range_and_length(Range, Size, Headers),
-    %% Rewrite status code when a (in)valid range is present.
-    Code0 = case Range of
+    NewHeaders = set_range_and_length(Range, Size, Headers),
+    %% Rewrite status code when a (in)valid range is present,
+    %% or file size is zero with an original satus code of 200.
+    NewCode = case Range of
                 undefined when Size =:= 0, Code =:= 200 -> 204;
                 undefined -> Code;
                 {_,_}     -> 206;
                 invalid   -> 416
             end,
 
-    ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code0), <<"\r\n">>,
-                       encode_headers(Headers0), <<"\r\n">>],
+    {NewCode, NewHeaders, [{size, Size}, {range, Range}]}.
+
+get_size(Filename) ->
+    case file:read_file_info(Filename) of
+        {ok, #file_info{size = Size}} -> Size;
+        _ -> 0
+    end.
+
+
+-spec send_file(Socket::inet:socket(), Code::response_code(), Headers::headers(),
+                Filename::file:filename(), FileOpts::file_opts(),
+                Callback::callback()) -> ok.
+
+%% @doc: Sends a HTTP response to the client where the body
+%% is the contents of the given file. Supports both file size and
+%% byte-ranges via FileOpts for partial file transfers.
+%% Assumes correctly set response code & headers.
+send_file(Socket, Code, Headers, Filename, FileOpts, {Mod, Args}) ->
+    Size  = proplists:get_value(size, FileOpts),
+    Range = proplists:get_value(range, FileOpts),
+    ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
+                       encode_headers(Headers), <<"\r\n">>],
+
     case gen_tcp:send(Socket, ResponseHeaders) of
         ok ->
             case send_file(Socket, Filename, Size, Range) of
@@ -208,9 +237,9 @@ send_file(Socket, RequestHeaders, Code, Headers, Filename, Opts, {Mod, Args}) ->
 %% Makes passing a size of 0 a no-op.
 %% The default behaviour of file:send_file/5 makes
 %% passing a length of 0 sending the complete file.
-send_file(_, _, 0, _) ->
+send_file(_Socket, _Filename, 0, _Range) ->
     {ok, 0};
-send_file(Socket, Filename, _, {First, Last}) ->
+send_file(Socket, Filename, _Size, {First, Last}) ->
     case file:open(Filename, [read, raw, binary]) of
         {ok, Fd} ->
             Res = file:sendfile(Fd, Socket, First, Last - First + 1, []),
@@ -219,17 +248,16 @@ send_file(Socket, Filename, _, {First, Last}) ->
         {error, Reason} ->
             {error, Reason}
     end;
+%% When both size and range are undefined, send
+%% entire file.
+send_file(Socket, Filename, undefined, undefined) ->
+    file:sendfile(Filename, Socket);
 send_file(Socket, Filename, Size, undefined) ->
     send_file(Socket, Filename, Size, {0, Size - 1});
 %% Don't send file when range is invalid.
-send_file(_, _, _, invalid) ->
+send_file(_Socket, _Filename, _Size, invalid) ->
     {error, invalid_range}.
 
-get_size(Filename) ->
-    case file:read_file_info(Filename) of
-        {ok, #file_info{size = Size}} -> Size;
-        _ -> 0
-    end.
 
 send_bad_request(Socket) ->
     Response = [<<"HTTP/1.1 ">>, status(400), <<"\r\n">>],

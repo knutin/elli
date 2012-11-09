@@ -17,6 +17,8 @@
 
 -type byte_range() :: {First::non_neg_integer(), Last::non_neg_integer()} |
                       undefined | invalid.
+-type file_opt() :: {size, non_neg_integer()} | {range, byte_range()}.
+-type file_opts() :: [file_opt()].
 
 -define(l2i(L), list_to_integer(L)).
 -define(i2l(I), integer_to_list(I)).
