@@ -219,18 +219,13 @@ post_pipeline() ->
 
     gen_tcp:send(Socket, <<Req/binary, Req/binary>>),
 
-    {ok, Res} = gen_tcp:recv(Socket, 0),
-
     ExpectedResponse = <<"HTTP/1.1 200 OK\r\n"
                          "Connection: Keep-Alive\r\n"
                          "Content-Length: 10\r\n"
                          "\r\n"
                          "Hello elli">>,
 
-    Res =:= binary:copy(ExpectedResponse, 2)
-        orelse error_logger:info_msg(
-                 "expected: ~p~ngot: ~p~n",
-                 [ExpectedResponse, Res]),
+    {ok, Res} = gen_tcp:recv(Socket, size(ExpectedResponse) * 2),
 
     ?assertEqual(binary:copy(ExpectedResponse, 2),
                  Res).
