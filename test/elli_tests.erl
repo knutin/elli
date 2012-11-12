@@ -20,6 +20,7 @@ elli_test_() ->
       ?_test(shorthand()),
       ?_test(too_many_headers()),
       ?_test(too_big_body()),
+      ?_test(way_too_big_body()),
       ?_test(bad_request_line()),
       ?_test(content_length()),
       ?_test(chunked()),
@@ -125,24 +126,33 @@ shorthand() ->
 
 too_many_headers() ->
     Headers = lists:duplicate(100, {"X-Foo", "Bar"}),
-    ?assertEqual({error, socket_closed_remotely},
-                 httpc:request(get, {"http://localhost:3001/foo", Headers},
-                               [], [])).
+    {ok, Response} = httpc:request(get, {"http://localhost:3001/foo", Headers},
+                                   [], []),
+    ?assertEqual(400, status(Response)).
 
 too_big_body() ->
     Body = binary:copy(<<"x">>, (1024 * 1000) + 1),
+    {ok, Response} = httpc:request(post,
+                                   {"http://localhost:3001/foo", [], [], Body},
+                                   [], []),
+    ?assertEqual(413, status(Response)).
+
+way_too_big_body() ->
+    Body = binary:copy(<<"x">>, (1024 * 2000) + 1),
     ?assertEqual({error, socket_closed_remotely},
                  httpc:request(post,
                                {"http://localhost:3001/foo", [], [], Body},
                                [], [])).
+
 
 bad_request_line() ->
     {ok, Socket} = gen_tcp:connect("127.0.0.1", 3001, [{active, false}, binary]),
 
     Req = <<"FOO BAR /hello HTTP/1.1\r\n">>,
     gen_tcp:send(Socket, <<Req/binary, Req/binary>>),
-
-    ?assertEqual({ok, <<"HTTP/1.1 400 Bad Request\r\n">>}, gen_tcp:recv(Socket, 0)).
+    ?assertEqual({ok, <<"HTTP/1.1 400 Bad Request\r\n"
+                        "Content-Length: 11\r\n\r\n">>},
+                 gen_tcp:recv(Socket, 0)).
 
 
 content_length() ->

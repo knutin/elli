@@ -182,7 +182,14 @@ send_file(Socket, Code, Headers, Filename, {Mod, Args}) ->
     end.
 
 send_bad_request(Socket) ->
-    Response = [<<"HTTP/1.1 ">>, status(400), <<"\r\n">>],
+    %% To send a response, we must first have received everything the
+    %% client is sending. If this is not the case, send_bad_request/1
+    %% might reset the client connection.
+
+    Body = <<"Bad Request">>,
+    Response = [<<"HTTP/1.1 ">>, status(400), <<"\r\n">>,
+               <<"Content-Length: ">>, integer_to_list(size(Body)), <<"\r\n">>,
+                <<"\r\n">>],
     gen_tcp:send(Socket, Response).
 
 %% @doc: Executes the user callback, translating failure into a proper
@@ -358,7 +365,7 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
         ContentLengthBin ->
             ContentLength = ?b2i(ContentLengthBin),
 
-            ok = check_max_size(Socket, ContentLength, Opts, Callback),
+            ok = check_max_size(Socket, ContentLength, Buffer, Opts, Callback),
 
             case ContentLength - byte_size(Buffer) of
                 0 ->
@@ -387,11 +394,28 @@ ensure_binary(Bin) when is_binary(Bin) -> Bin;
 ensure_binary(Atom) when is_atom(Atom) -> atom_to_binary(Atom, latin1).
 
 
-check_max_size(Socket, ContentLength, Opts, {Mod, Args}) ->
+check_max_size(Socket, ContentLength, Buffer, Opts, {Mod, Args}) ->
     case ContentLength > max_body_size(Opts) of
         true ->
             Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),
-            gen_tcp:close(Socket),
+
+            %% To send a response, we must furst receive anything the
+            %% client is sending. To avoid allowing clients to use all
+            %% our bandwidth, if the request size is too big, we
+            %% simply close the socket.
+
+            case ContentLength < max_body_size(Opts) * 2 of
+                true ->
+                    OnSocket = ContentLength - size(Buffer),
+                    gen_tcp:recv(Socket, OnSocket, 60000),
+                    Response = [<<"HTTP/1.1 ">>, status(413), <<"\r\n">>,
+                                <<"Content-Length: 0">>, <<"\r\n\r\n">>],
+                    gen_tcp:send(Socket, Response),
+                    gen_tcp:close(Socket);
+                false ->
+                    gen_tcp:close(Socket)
+            end,
+
             exit(normal);
         false ->
             ok
