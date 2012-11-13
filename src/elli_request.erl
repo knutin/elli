@@ -19,6 +19,7 @@
          , peer/1
          , method/1
          , body/1
+         , get_range/1
          , get_header/3
          , to_proplist/1
         ]).
@@ -95,6 +96,57 @@ query_str(#req{raw_path = Path}) ->
         [_]     -> <<>>
     end.
 
+
+-spec get_range(#req{}) -> byte_range_set() | parse_error.
+%% @doc: Parses the Range header from the request.
+%% The result is either a byte_range_set() or the atom `parse_error'.
+%% Use elli_util:normalize_range/2 to get a validated, normalized range.
+get_range(#req{headers = Headers})  ->
+    case proplists:get_value(<<"Range">>, Headers) of
+        <<$b,$y,$t,$e,$s,$=, RangeSetBin/binary>> ->
+            parse_range_set(RangeSetBin);
+        _  -> []
+    end.
+
+
+-spec parse_range_set(Bin::binary()) -> byte_range_set() | parse_error.
+
+parse_range_set(<<ByteRangeSet/binary>>) ->
+    RangeBins = binary:split(ByteRangeSet, <<",">>, [global]),
+    Parsed = [parse_range(remove_whitespace(RangeBin))
+              || RangeBin <- RangeBins],
+    case lists:any(fun(parse_error) -> true; (_) -> false end, Parsed) of
+        true  -> parse_error;
+        false -> Parsed
+    end.
+
+-spec parse_range(Bin::binary()) -> byte_range() | parse_error.
+
+parse_range(<<$-, SuffixBin/binary>>) ->
+    %% suffix-byte-range
+    try {suffix, ?b2i(SuffixBin)}
+    catch
+        error:badarg -> parse_error
+    end;
+parse_range(<<ByteRange/binary>>) ->
+    case binary:split(ByteRange, <<"-">>) of
+        %% byte-range without last-byte-pos
+        [FirstBytePosBin, <<>>] ->
+            try {offset, ?b2i(FirstBytePosBin)}
+            catch
+                error:badarg -> parse_error
+            end;
+        %% full byte-range
+        [FirstBytePosBin, LastBytePosBin] ->
+            try {bytes, ?b2i(FirstBytePosBin), ?b2i(LastBytePosBin)}
+            catch
+                error:badarg -> parse_error
+            end;
+        _ -> parse_error
+    end.
+
+remove_whitespace(Bin) ->
+    binary:replace(Bin,<<" ">>, <<>>, [global]).
 
 %% @doc: Serializes the request record to a proplist. Useful for
 %% logging

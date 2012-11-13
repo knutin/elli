@@ -91,30 +91,36 @@ handle('GET', [<<"crash">>], _Req) ->
 handle('GET', [<<"sendfile">>], _Req) ->
     %% Returning {file, "/path/to/file"} instead of the body results
     %% in Elli using sendfile.
-
+    %% All required headers should be added by the handler.
     F = "../README.md",
+    Size = elli_util:file_size(F),
+    {ok, [{<<"Content-Length">>, Size}], {file, F}};
 
-    {200, [], {file, F, []}};
-
-handle('GET', [<<"sendfile">>, <<"range">>], _Req) ->
-    %% Returns the next 400 bytes of the file,
-    %% starting at an offset of 300.
+handle('GET', [<<"sendfile">>, <<"range">>], Req) ->
+    %% Read the Range header of the request and use the normalized
+    %% range with sendfile, otherwise send the entire file when
+    %% no range is present, or respond with a 416 if the range is invalid.
     F = "../README.md",
-
-    {200, [], {file, F, [{range, {300, 699}}]}};
+    Size = elli_util:file_size(F),
+    Range = elli_util:normalize_range(elli_request:get_range(Req), Size),
+    case Range of
+        {_Offset, Length} ->
+            {206, [{<<"Content-Length">>, Length},
+                   {<<"Content-Range">>, elli_util:encode_range(Range, Size)}],
+             {file, F, [{range, Range}]}};
+        undefined ->
+            {200, [{<<"Content-Length">>, Size}], {file, F}};
+        invalid_range ->
+            {416, [{<<"Content-Length">>, 0},
+                   {<<"Content-Range">>, elli_util:encode_range(invalid_range, Size)}],
+             []}
+    end;
 
 handle('GET', [<<"sendfile">>, <<"size">>], _Req) ->
-    %% Returns the the entire file, by explicitly setting
-    %% the size. Using this option bypasses checks for
-    %% file existence and size, so use appropriately.
-    F = "../README.md",
-    {ok, #file_info{size = Size}} = file:read_file_info(F),
-    {200, [], {file, F, [{size, Size}]}};
-
-handle('GET', [<<"sendfile">>, <<"size-0">>], _Req) ->
-    %% Returns a 204, by setting size to 0.
-    F = "../README.md",
-    {200, [], {file, F, [{size, 0}]}};
+    %% Returns the first 100 bytes of the file,
+    %% without setting a range.
+    F = "../README.md", Size = 100,
+    {ok, [{<<"Content-Length">>, Size}], {file, F, [{size, Size}]}};
 
 handle('GET', [<<"compressed">>], _Req) ->
     %% Body with a byte size over 1024 are automatically gzipped by

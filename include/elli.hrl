@@ -16,8 +16,13 @@
 -type connection_token_atom() :: keep_alive | close.
 
 -type byte_range() :: {First::non_neg_integer(), Last::non_neg_integer()} |
-                      undefined | invalid.
--type file_opt() :: {size, non_neg_integer()} | {range, byte_range()}.
+                      {offset, Offset::non_neg_integer()} |
+                      {suffix, Length::pos_integer()}.
+-type byte_range_set() :: [byte_range()].
+
+-type normalized_range() :: {Offset::non_neg_integer(), Length::non_neg_integer()}.
+
+-type file_opt() :: {size, non_neg_integer()} | {range, normalized_range()}.
 -type file_opts() :: [file_opt()].
 
 -define(l2i(L), list_to_integer(L)).
