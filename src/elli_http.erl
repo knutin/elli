@@ -174,7 +174,7 @@ send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
 
     case file:open(Filename, [read, raw, binary]) of
         {ok, Fd} ->
-            case gen_tcp:send(Socket, ResponseHeaders) of
+            try gen_tcp:send(Socket, ResponseHeaders) of
                 ok ->
                     case file:sendfile(Fd, Socket, Offset, Length, []) of
                         {ok, _BytesSent} ->
@@ -184,7 +184,9 @@ send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
                     end;
                 {error, closed} ->
                     Mod:handle_event(client_closed, [before_response], Args)
-            end, file:close(Fd);
+            after
+                file:close(Fd)
+            end;
         {error, FileError} ->
             Mod:handle_event(file_error, [FileError], Args)
     end, ok.
