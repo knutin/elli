@@ -25,7 +25,6 @@ elli_test_() ->
       ?_test(chunked()),
       ?_test(sendfile()),
       ?_test(sendfile_range()),
-      ?_test(sendfile_size()),
       ?_test(slow_client()),
       ?_test(post_pipeline()),
       ?_test(get_pipeline()),
@@ -198,21 +197,6 @@ sendfile_range() ->
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "400"},
                   {"content-range", "bytes 300-699/" ++ ?i2l(Size)}],
-                 headers(Response)),
-    ?assertEqual(binary_to_list(Expected), body(Response)).
-
-
-sendfile_size() ->
-    {ok, Response} = httpc:request("http://localhost:3001/sendfile/size"),
-
-    F = "../README.md",
-    {ok, Fd} = file:open(F, [read, raw, binary]),
-    {ok, Expected} = file:pread(Fd, 0, 100),
-    file:close(Fd),
-
-    ?assertEqual(200, status(Response)),
-    ?assertEqual([{"connection", "Keep-Alive"},
-                  {"content-length", integer_to_list(size(Expected))}],
                  headers(Response)),
     ?assertEqual(binary_to_list(Expected), body(Response)).
 

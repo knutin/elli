@@ -97,7 +97,7 @@ query_str(#req{raw_path = Path}) ->
     end.
 
 
--spec get_range(#req{}) -> byte_range_set() | parse_error.
+-spec get_range(#req{}) -> [http_range()] | parse_error.
 %% @doc: Parses the Range header from the request.
 %% The result is either a byte_range_set() or the atom `parse_error'.
 %% Use elli_util:normalize_range/2 to get a validated, normalized range.
@@ -109,7 +109,7 @@ get_range(#req{headers = Headers})  ->
     end.
 
 
--spec parse_range_set(Bin::binary()) -> byte_range_set() | parse_error.
+-spec parse_range_set(Bin::binary()) -> [http_range()] | parse_error.
 
 parse_range_set(<<ByteRangeSet/binary>>) ->
     RangeBins = binary:split(ByteRangeSet, <<",">>, [global]),
@@ -120,7 +120,7 @@ parse_range_set(<<ByteRangeSet/binary>>) ->
         false -> Parsed
     end.
 
--spec parse_range(Bin::binary()) -> byte_range() | parse_error.
+-spec parse_range(Bin::binary()) -> http_range() | parse_error.
 
 parse_range(<<$-, SuffixBin/binary>>) ->
     %% suffix-byte-range

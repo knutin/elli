@@ -107,7 +107,7 @@ handle('GET', [<<"sendfile">>, <<"range">>], Req) ->
         {_Offset, Length} ->
             {206, [{<<"Content-Length">>, Length},
                    {<<"Content-Range">>, elli_util:encode_range(Range, Size)}],
-             {file, F, [{range, Range}]}};
+             {file, F, Range}};
         undefined ->
             {200, [{<<"Content-Length">>, Size}], {file, F}};
         invalid_range ->
@@ -115,12 +115,6 @@ handle('GET', [<<"sendfile">>, <<"range">>], Req) ->
                    {<<"Content-Range">>, elli_util:encode_range(invalid_range, Size)}],
              []}
     end;
-
-handle('GET', [<<"sendfile">>, <<"size">>], _Req) ->
-    %% Returns the first 100 bytes of the file,
-    %% without setting a range.
-    F = "../README.md", Size = 100,
-    {ok, [{<<"Content-Length">>, Size}], {file, F, [{size, Size}]}};
 
 handle('GET', [<<"compressed">>], _Req) ->
     %% Body with a byte size over 1024 are automatically gzipped by

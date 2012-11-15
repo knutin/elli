@@ -9,7 +9,7 @@
         ]).
 
 -spec normalize_range(RangeOrSet::any(), Size::integer()) ->
-                             normalized_range() | undefined | invalid_range.       
+                             range() | undefined | invalid_range.       
 %% @doc: If a valid byte-range, or byte-range-set of size 1
 %% is supplied, returns a normalized range in the format
 %% {Offset, Length}. Returns undefined when an empty byte-range-set
@@ -35,8 +35,8 @@ normalize_range([], _Size) -> undefined;
 normalize_range(_, _Size) -> invalid_range.            
 
 
--spec encode_range(Range::normalized_range() | invalid_range, 
-                   Size::non_neg_integer()) -> EncodedByteRange::iolist().
+-spec encode_range(Range::range() | invalid_range, 
+                   Size::non_neg_integer()) -> ByteRange::iolist().
 %% @doc: Encode Range to a Content-Range value.
 encode_range(Range, Size) ->
     [<<"bytes ">>, encode_range_bytes(Range),

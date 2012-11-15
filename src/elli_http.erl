@@ -107,11 +107,11 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
                              Args),
             {close, <<>>};
 
-        {file, ResponseCode, UserHeaders, Filename, FileOpts} ->
+        {file, ResponseCode, UserHeaders, Filename, Range} ->
             t(user_end),
 
             ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
-            send_file(S, ResponseCode, ResponseHeaders, Filename, FileOpts, Callback),
+            send_file(S, ResponseCode, ResponseHeaders, Filename, Range, Callback),
 
             t(request_end),
 
@@ -163,54 +163,31 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
 
 
 -spec send_file(Socket::inet:socket(), Code::response_code(), Headers::headers(),
-                Filename::file:filename(), FileOpts::file_opts(),
+                Filename::file:filename(), Range::range(),
                 Callback::callback()) -> ok.
 %% @doc: Sends a HTTP response to the client where the body
-%% is the contents of the given file. Supports both file size and
-%% byte-ranges via FileOpts for partial file transfers.
+%% is the contents of the given file. 
 %% Assumes correctly set response code & headers.
-send_file(Socket, Code, Headers, Filename, FileOpts, {Mod, Args}) ->
-    Size  = proplists:get_value(size, FileOpts),
-    Range = proplists:get_value(range, FileOpts),
+send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
     ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                        encode_headers(Headers), <<"\r\n">>],
 
-    case gen_tcp:send(Socket, ResponseHeaders) of
-        ok ->
-            case send_file(Socket, Filename, Size, Range) of
-                {ok, _BytesSent} -> ok;
-                {error, closed} ->
-                    Mod:handle_event(client_closed, [before_response], Args),
-                    ok;
-                {error, FileError} ->
-                    Mod:handle_event(send_file_error, [FileError], Args),
-                    ok
-            end;
-        {error, closed} ->
-            Mod:handle_event(client_closed, [before_response], Args),
-            ok
-    end.
-
-%% If a range is present, use it for file:sendfile/5 and
-%% ignore size. A range of {0, 0} sends the entire file. 
-send_file(Socket, Filename, _Size, {Offset, Length}) ->
     case file:open(Filename, [read, raw, binary]) of
         {ok, Fd} ->
-            Res = file:sendfile(Fd, Socket, Offset, Length, []),
-            file:close(Fd),
-            Res;
-        {error, Reason} ->
-            {error, Reason}
-    end;
-%% When both size and range are undefined, send
-%% entire file.
-send_file(Socket, Filename, undefined, undefined) ->
-    file:sendfile(Filename, Socket);
-%% If no range is defined, use size as length.
-send_file(Socket, Filename, Size, undefined) ->
-    send_file(Socket, Filename, Size, {0, Size});
-send_file(_Socket, _Filename, _, _) -> {error, badarg}.
-
+            case gen_tcp:send(Socket, ResponseHeaders) of
+                ok ->
+                    case file:sendfile(Fd, Socket, Offset, Length, []) of
+                        {ok, _BytesSent} ->
+                            ok;
+                        {error, closed} ->
+                            Mod:handle_event(client_closed, [before_response], Args)
+                    end;
+                {error, closed} ->
+                    Mod:handle_event(client_closed, [before_response], Args)
+            end, file:close(Fd);
+        {error, FileError} ->
+            Mod:handle_event(file_error, [FileError], Args)
+    end, ok.
 
 send_bad_request(Socket) ->
     Response = [<<"HTTP/1.1 ">>, status(400), <<"\r\n">>],
@@ -220,15 +197,15 @@ send_bad_request(Socket) ->
 %% response.
 execute_callback(Req, {Mod, Args}) ->
     try Mod:handle(Req, Args) of
-        {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename, []};
-        {ok, Headers, {file, Filename, Opts}} -> {file, 200, Headers, Filename, Opts};
+        {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename, {0, 0}};
+        {ok, Headers, {file, Filename, Range}}-> {file, 200, Headers, Filename, Range};
         {ok, Headers, Body}                   -> {response, 200, Headers, Body};
         {ok, Body}                            -> {response, 200, [], Body};
         {chunk, Headers}                      -> {chunk, Headers, <<"">>};
         {chunk, Headers, Initial}             -> {chunk, Headers, Initial};
-        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename, []};
-        {HttpCode, Headers, {file, Filename, Opts}} ->
-                                                 {file, HttpCode, Headers, Filename, Opts};
+        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename, {0, 0}};
+        {HttpCode, Headers, {file, Filename, Range}} ->
+                                                 {file, HttpCode, Headers, Filename, Range};
         {HttpCode, Headers, Body}             -> {response, HttpCode, Headers, Body};
         {HttpCode, Body}                      -> {response, HttpCode, [], Body}
     catch
