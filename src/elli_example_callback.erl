@@ -90,14 +90,31 @@ handle('GET', [<<"crash">>], _Req) ->
 
 handle('GET', [<<"sendfile">>], _Req) ->
     %% Returning {file, "/path/to/file"} instead of the body results
-    %% in Elli using sendfile. In the name of performance, Elli
-    %% requires you to specify the Content-Length header, since you
-    %% probably already stated the file to check if it exists.
+    %% in Elli using sendfile.
+    %% All required headers should be added by the handler.
+    F = "../README.md",
+    Size = elli_util:file_size(F),
+    {ok, [{<<"Content-Length">>, Size}], {file, F}};
 
-    F = "../src/elli_example_callback.erl",
-    {ok, #file_info{size = Size}} = file:read_file_info(F),
-
-    {200, [{<<"Content-Length">>, Size}], {file, F}};
+handle('GET', [<<"sendfile">>, <<"range">>], Req) ->
+    %% Read the Range header of the request and use the normalized
+    %% range with sendfile, otherwise send the entire file when
+    %% no range is present, or respond with a 416 if the range is invalid.
+    F = "../README.md",
+    Size = elli_util:file_size(F),
+    Range = elli_util:normalize_range(elli_request:get_range(Req), Size),
+    case Range of
+        {_Offset, Length} ->
+            {206, [{<<"Content-Length">>, Length},
+                   {<<"Content-Range">>, elli_util:encode_range(Range, Size)}],
+             {file, F, Range}};
+        undefined ->
+            {200, [{<<"Content-Length">>, Size}], {file, F}};
+        invalid_range ->
+            {416, [{<<"Content-Length">>, 0},
+                   {<<"Content-Range">>, elli_util:encode_range(invalid_range, Size)}],
+             []}
+    end;
 
 handle('GET', [<<"compressed">>], _Req) ->
     %% Body with a byte size over 1024 are automatically gzipped by

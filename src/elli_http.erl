@@ -6,6 +6,7 @@
 -module(elli_http).
 -include("../include/elli.hrl").
 
+
 %% API
 -export([start_link/4]).
 
@@ -106,12 +107,11 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
                              Args),
             {close, <<>>};
 
-        {file, ResponseCode, UserHeaders, Filename} ->
+        {file, ResponseCode, UserHeaders, Filename, Range} ->
             t(user_end),
 
-            %% Handlers sending files should provide Content-Length header
             ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
-            send_file(S, ResponseCode, ResponseHeaders, Filename, Callback),
+            send_file(S, ResponseCode, ResponseHeaders, Filename, Range, Callback),
 
             t(request_end),
 
@@ -162,24 +162,34 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
     end.
 
 
-%% @doc: Generates and sends a HTTP response to the client where the body
-%% is the contents of the given file.
-send_file(Socket, Code, Headers, Filename, {Mod, Args}) ->
+-spec send_file(Socket::inet:socket(), Code::response_code(), Headers::headers(),
+                Filename::file:filename(), Range::range(),
+                Callback::callback()) -> ok.
+%% @doc: Sends a HTTP response to the client where the body
+%% is the contents of the given file. 
+%% Assumes correctly set response code & headers.
+send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
     ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                        encode_headers(Headers), <<"\r\n">>],
 
-    case gen_tcp:send(Socket, ResponseHeaders) of
-        ok ->
-            case file:sendfile(Filename, Socket) of
-                {ok, _BytesSent} -> ok;
+    case file:open(Filename, [read, raw, binary]) of
+        {ok, Fd} ->
+            try gen_tcp:send(Socket, ResponseHeaders) of
+                ok ->
+                    case file:sendfile(Fd, Socket, Offset, Length, []) of
+                        {ok, _BytesSent} ->
+                            ok;
+                        {error, closed} ->
+                            Mod:handle_event(client_closed, [before_response], Args)
+                    end;
                 {error, closed} ->
-                    Mod:handle_event(client_closed, [before_response], Args),
-                    ok
+                    Mod:handle_event(client_closed, [before_response], Args)
+            after
+                file:close(Fd)
             end;
-        {error, closed} ->
-            Mod:handle_event(client_closed, [before_response], Args),
-            ok
-    end.
+        {error, FileError} ->
+            Mod:handle_event(file_error, [FileError], Args)
+    end, ok.
 
 send_bad_request(Socket) ->
     %% To send a response, we must first have received everything the
@@ -196,12 +206,15 @@ send_bad_request(Socket) ->
 %% response.
 execute_callback(Req, {Mod, Args}) ->
     try Mod:handle(Req, Args) of
-        {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename};
+        {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename, {0, 0}};
+        {ok, Headers, {file, Filename, Range}}-> {file, 200, Headers, Filename, Range};
         {ok, Headers, Body}                   -> {response, 200, Headers, Body};
         {ok, Body}                            -> {response, 200, [], Body};
         {chunk, Headers}                      -> {chunk, Headers, <<"">>};
         {chunk, Headers, Initial}             -> {chunk, Headers, Initial};
-        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename};
+        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename, {0, 0}};
+        {HttpCode, Headers, {file, Filename, Range}} ->
+                                                 {file, HttpCode, Headers, Filename, Range};
         {HttpCode, Headers, Body}             -> {response, HttpCode, Headers, Body};
         {HttpCode, Body}                      -> {response, HttpCode, [], Body}
     catch
