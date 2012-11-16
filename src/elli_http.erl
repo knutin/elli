@@ -464,7 +464,10 @@ connection_token(#req{version = {1, 0}, headers = Headers}) ->
     case proplists:get_value(<<"Connection">>, Headers) of
         <<"Keep-Alive">> -> <<"Keep-Alive">>;
         _                -> <<"close">>
-    end.
+    end;
+connection_token(#req{version = {0, 9}}) ->
+    <<"close">>.
+
 
 close_or_keepalive(Req, UserHeaders) ->
     case proplists:get_value(<<"Connection">>, UserHeaders) of
