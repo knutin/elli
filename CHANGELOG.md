@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v0.4
+
+ * Added support for sending ranges of a file with sendfile by
+   returning `{Code, Headers, {file, Filename, {Offset, Length}}}`. If
+   no offset and length is specified, the entire file is sent. The
+   user must provide an appropriate "Content-Length" and
+   "Content-Range" header, see the example in
+   `elli_example_callback.erl`
+   (https://github.com/knutin/elli/blob/master/src/elli_example_callback.erl#L99). Thanks
+   Vincent Siliakus (zambal).
+
+
 ## v0.3
 
  * Breaking change: Timeouts used in the HTTP protocol are now
