@@ -25,6 +25,7 @@ elli_test_() ->
       ?_test(content_length()),
       ?_test(chunked()),
       ?_test(sendfile()),
+      ?_test(sendfile_range()),
       ?_test(slow_client()),
       ?_test(post_pipeline()),
       ?_test(get_pipeline()),
@@ -177,14 +178,35 @@ chunked() ->
                   {"content-type", "text/event-stream"}], headers(Response)),
     ?assertEqual(Expected, body(Response)).
 
+
 sendfile() ->
     {ok, Response} = httpc:request("http://localhost:3001/sendfile"),
 
-    F = "../src/elli_example_callback.erl",
+    F = "../README.md",
     {ok, Expected} = file:read_file(F),
 
+    ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", integer_to_list(size(Expected))}],
+                 headers(Response)),
+    ?assertEqual(binary_to_list(Expected), body(Response)).
+
+
+sendfile_range() ->
+    Headers = [{"Range", "bytes=300-699"}],
+    {ok, Response} = httpc:request(
+		       get, {"http://localhost:3001/sendfile/range", Headers}, [], []),
+
+    F = "../README.md",
+    {ok, Fd} = file:open(F, [read, raw, binary]),
+    {ok, Expected} = file:pread(Fd, 300, 400),
+    file:close(Fd),
+    Size = elli_util:file_size(F),
+
+    ?assertEqual(206, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "400"},
+                  {"content-range", "bytes 300-699/" ++ ?i2l(Size)}],
                  headers(Response)),
     ?assertEqual(binary_to_list(Expected), body(Response)).
 
@@ -343,6 +365,51 @@ query_str_test_() ->
         ?_assertEqual(<<"bar=baz&baz=bang">>,
                       elli_request:query_str(MakeReq(<<"/foo?bar=baz&baz=bang">>)))
     ].
+
+
+get_range_test_() ->
+    Req      = #req{headers = [{<<"Range">>,<<"bytes=0-99 ,500-999 , -800">>}]},
+    OffsetReq = #req{headers = [{<<"Range">>,<<"bytes=200-">>}]},
+    UndefReq = #req{headers = []},
+    BadReq   = #req{headers = [{<<"Range">>,<<"bytes=--99,hallo-world">>}]},
+    
+    ByteRangeSet = [{bytes, 0, 99}, {bytes, 500, 999}, {suffix, 800}],
+
+    [?_assertEqual(ByteRangeSet,    elli_request:get_range(Req)),     
+     ?_assertEqual([{offset, 200}], elli_request:get_range(OffsetReq)),
+     ?_assertEqual([],              elli_request:get_range(UndefReq)),
+     ?_assertEqual(parse_error,     elli_request:get_range(BadReq))].
+
+normalize_range_test_() ->
+    Size = 1000,
+
+    Bytes1   = {bytes, 200, 400},
+    Bytes2   = {bytes, 0, 1000000},
+    Suffix   = {suffix, 303},
+    Offset   = {offset, 42},
+    Normal   = {200, 400},
+    Set      = [{bytes, 0, 999}],
+    EmptySet = [],
+    Invalid1 = {bytes, 400, 200}, 
+    Invalid2 = {bytes, 1200, 2000}, 
+    Invalid3 = {offset, -10},
+    Invalid4 = {offset, 2000},
+    Invalid5 = parse_error,
+    Invalid6 = [{bytes, 0, 100}, {suffix, 42}],
+
+    [?_assertEqual({200, 201},        elli_util:normalize_range(Bytes1, Size)),
+     ?_assertEqual({0, Size},         elli_util:normalize_range(Bytes2, Size)),
+     ?_assertEqual({Size - 303, 303}, elli_util:normalize_range(Suffix, Size)),
+     ?_assertEqual({42, Size - 42},   elli_util:normalize_range(Offset, Size)),
+     ?_assertEqual({200, 400},        elli_util:normalize_range(Normal, Size)),
+     ?_assertEqual({0, 1000},         elli_util:normalize_range(Set, Size)),
+     ?_assertEqual(undefined,         elli_util:normalize_range(EmptySet, Size)),
+     ?_assertEqual(invalid_range,     elli_util:normalize_range(Invalid1, Size)),
+     ?_assertEqual(invalid_range,     elli_util:normalize_range(Invalid2, Size)),
+     ?_assertEqual(invalid_range,     elli_util:normalize_range(Invalid3, Size)),
+     ?_assertEqual(invalid_range,     elli_util:normalize_range(Invalid4, Size)),
+     ?_assertEqual(invalid_range,     elli_util:normalize_range(Invalid5, Size)),
+     ?_assertEqual(invalid_range,     elli_util:normalize_range(Invalid6, Size))].
 
 
 register_test() ->

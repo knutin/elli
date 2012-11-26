@@ -15,6 +15,12 @@
 -type response_code() :: 100..999.
 -type connection_token_atom() :: keep_alive | close.
 
+-type http_range() :: {First::non_neg_integer(), Last::non_neg_integer()} |
+                      {offset, Offset::non_neg_integer()} |
+                      {suffix, Length::pos_integer()}.
+
+-type range() :: {Offset::non_neg_integer(), Length::non_neg_integer()}.
+
 -define(l2i(L), list_to_integer(L)).
 -define(i2l(I), integer_to_list(I)).
 -define(b2i(I), list_to_integer(binary_to_list(I))).
