@@ -165,9 +165,9 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
 -spec send_file(Socket::inet:socket(), Code::response_code(), Headers::headers(),
                 Filename::file:filename(), Range::range(),
                 Callback::callback()) -> ok.
-%% @doc: Sends a HTTP response to the client where the body
-%% is the contents of the given file. 
-%% Assumes correctly set response code & headers.
+%% @doc: Sends a HTTP response to the client where the body is the
+%% contents of the given file.  Assumes correctly set response code &
+%% headers.
 send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
     ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                        encode_headers(Headers), <<"\r\n">>],
@@ -212,9 +212,10 @@ execute_callback(Req, {Mod, Args}) ->
         {ok, Body}                            -> {response, 200, [], Body};
         {chunk, Headers}                      -> {chunk, Headers, <<"">>};
         {chunk, Headers, Initial}             -> {chunk, Headers, Initial};
-        {HttpCode, Headers, {file, Filename}} -> {file, HttpCode, Headers, Filename, {0, 0}};
+        {HttpCode, Headers, {file, Filename}} ->
+            {file, HttpCode, Headers, Filename, {0, 0}};
         {HttpCode, Headers, {file, Filename, Range}} ->
-                                                 {file, HttpCode, Headers, Filename, Range};
+            {file, HttpCode, Headers, Filename, Range};
         {HttpCode, Headers, Body}             -> {response, HttpCode, Headers, Body};
         {HttpCode, Body}                      -> {response, HttpCode, [], Body}
     catch
@@ -412,7 +413,7 @@ check_max_size(Socket, ContentLength, Buffer, Opts, {Mod, Args}) ->
         true ->
             Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),
 
-            %% To send a response, we must furst receive anything the
+            %% To send a response, we must first receive anything the
             %% client is sending. To avoid allowing clients to use all
             %% our bandwidth, if the request size is too big, we
             %% simply close the socket.
@@ -459,7 +460,6 @@ connection_token(#req{version = {1, 1}, headers = Headers}) ->
         <<"Close">> -> <<"close">>;
         _           -> <<"Keep-Alive">>
     end;
-
 connection_token(#req{version = {1, 0}, headers = Headers}) ->
     case proplists:get_value(<<"Connection">>, Headers) of
         <<"Keep-Alive">> -> <<"Keep-Alive">>;
