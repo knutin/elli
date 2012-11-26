@@ -103,7 +103,7 @@ query_str(#req{raw_path = Path}) ->
 %% Use elli_util:normalize_range/2 to get a validated, normalized range.
 get_range(#req{headers = Headers})  ->
     case proplists:get_value(<<"Range">>, Headers) of
-        <<$b,$y,$t,$e,$s,$=, RangeSetBin/binary>> ->
+        <<"bytes=", RangeSetBin/binary>> ->
             parse_range_set(RangeSetBin);
         _  -> []
     end.
