@@ -14,7 +14,7 @@
 -export([call/5]).
 
 -spec call(Method::http_method(), Path::binary(),
-           Headers::headers(), Body::body(), Opts::proplist:proplist()) ->
+           Headers::headers(), Body::body(), Opts::proplists:proplist()) ->
                   record(req).
 call(Method, Path, Headers, Body, Opts) ->
     Callback = proplists:get_value(callback, Opts),

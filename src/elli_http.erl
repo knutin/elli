@@ -122,8 +122,8 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
             {close_or_keepalive(Req, UserHeaders), B2}
     end.
 
--spec mk_req(Method::http_method(), RawPath::binary(), RequestHeaders::headers(),
-             RequestBody::body(), V::version(), Socket::inet:socket(),
+-spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()}, RequestHeaders::headers(),
+             RequestBody::body(), V::version(), Socket::inet:socket() | undefined,
              Callback::callback()) -> record(req).
 mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
     {Mod, Args} = Callback,
@@ -361,7 +361,7 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
     end.
 
 -spec get_body(port(), headers(), binary(),
-               proplists:proplist(), callback()) -> body().
+               proplists:proplist(), callback()) -> {body(), binary()}.
 %% @doc: Fetches the full body of the request, if any is available.
 %%
 %% At the moment we don't need to handle large requests, so there is
