@@ -27,14 +27,6 @@
 
 -type timestamp() :: {integer(), integer(), integer()}.
 
-
--record(state, {socket,
-                acceptors,
-                open_reqs,
-                options,
-                callback :: callback()
-}).
-
 -record(req, {
           method :: http_method(),
           path :: [binary()],
