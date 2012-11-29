@@ -192,8 +192,10 @@ send_chunk(Ref, Data, Timeout) ->
             {error, timeout}
     end.
 
-is_ref_alive(Ref) ->
+is_ref_alive(Ref) when is_pid(Ref) ->
     case node(Ref) =:= node() of
         true -> is_process_alive(Ref);
         false -> rpc:call(node(Ref), erlang, is_process_alive, [Ref])
-    end.
+    end;
+is_ref_alive(_Ref) ->
+    false.
