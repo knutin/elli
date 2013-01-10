@@ -81,9 +81,9 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
                           ResponseHeaders, UserBody, Callback),
 
             t(request_end),
-            Mod:handle_event(request_complete,
-                             [Req, ResponseCode, ResponseHeaders, UserBody, get_timings()],
-                             Args),
+            handle_event(Mod, request_complete,
+                         [Req, ResponseCode, ResponseHeaders, UserBody, get_timings()],
+                         Args),
 
             {close_or_keepalive(Req, UserHeaders), B2};
 
@@ -102,9 +102,9 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
                          end,
 
             t(request_end),
-            Mod:handle_event(chunk_complete,
-                             [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
-                             Args),
+            handle_event(Mod, chunk_complete,
+                         [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
+                         Args),
             {close, <<>>};
 
         {file, ResponseCode, UserHeaders, Filename, Range} ->
@@ -115,9 +115,9 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
 
             t(request_end),
 
-            Mod:handle_event(request_complete,
-                             [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
-                             Args),
+            handle_event(Mod, request_complete,
+                         [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
+                         Args),
 
             {close_or_keepalive(Req, UserHeaders), B2}
     end.
@@ -133,8 +133,8 @@ mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
                  raw_path = Path, headers = RequestHeaders,
                  body = RequestBody, pid = self(), socket = Socket};
         {error, Reason} ->
-            Mod:handle_event(request_parse_error,
-                    [{Reason, {Method, RawPath}}], Args),
+            handle_event(Mod, request_parse_error,
+                         [{Reason, {Method, RawPath}}], Args),
             send_bad_request(Socket),
             gen_tcp:close(Socket),
             exit(normal)
@@ -157,7 +157,7 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
     case gen_tcp:send(Socket, Response) of
         ok -> ok;
         {error, closed} ->
-            Mod:handle_event(client_closed, [before_response], Args),
+            handle_event(Mod, client_closed, [before_response], Args),
             ok
     end.
 
@@ -180,15 +180,15 @@ send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
                         {ok, _BytesSent} ->
                             ok;
                         {error, closed} ->
-                            Mod:handle_event(client_closed, [before_response], Args)
+                            handle_event(Mod, client_closed, [before_response], Args)
                     end;
                 {error, closed} ->
-                    Mod:handle_event(client_closed, [before_response], Args)
+                    handle_event(Mod, client_closed, [before_response], Args)
             after
                 file:close(Fd)
             end;
         {error, FileError} ->
-            Mod:handle_event(file_error, [FileError], Args)
+            handle_event(Mod, file_error, [FileError], Args)
     end, ok.
 
 send_bad_request(Socket) ->
@@ -316,18 +316,18 @@ get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
                     NewBuffer = <<Buffer/binary, Data/binary>>,
                     get_request(Socket, NewBuffer, Options, Callback);
                 {error, timeout} ->
-                    Mod:handle_event(request_timeout, [], Args),
+                    handle_event(Mod, request_timeout, [], Args),
                     gen_tcp:close(Socket),
                     exit(normal);
                 {error, closed} ->
-                    Mod:handle_event(request_closed, [], Args),
+                    handle_event(Mod, request_closed, [], Args),
                     gen_tcp:close(Socket),
                     exit(normal)
             end;
         {ok, {http_request, Method, RawPath, Version}, Rest} ->
             {Method, RawPath, Version, Rest};
         {ok, {http_error, _}, _} ->
-            Mod:handle_event(request_parse_error, [Buffer], Args),
+            handle_event(Mod, request_parse_error, [Buffer], Args),
             send_bad_request(Socket),
             gen_tcp:close(Socket),
             exit(normal)
@@ -342,7 +342,7 @@ get_headers(Socket, {1, _}, Buffer, Opts, Callback) ->
 
 get_headers(Socket, _, Headers, HeadersCount, _Opts, {Mod, Args})
   when HeadersCount >= 100 ->
-    Mod:handle_event(bad_request, [{too_many_headers, Headers}], Args),
+    handle_event(Mod, bad_request, [{too_many_headers, Headers}], Args),
     send_bad_request(Socket),
     gen_tcp:close(Socket),
     exit(normal);
@@ -359,11 +359,11 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
                     get_headers(Socket, <<Buffer/binary, Data/binary>>,
                                 Headers, HeadersCount, Opts, Callback);
                 {error, closed} ->
-                    Mod:handle_event(client_closed, [receiving_headers], Args),
+                    handle_event(Mod, client_closed, [receiving_headers], Args),
                     gen_tcp:close(Socket),
                     exit(normal);
                 {error, timeout} ->
-                    Mod:handle_event(client_timeout, [receiving_headers], Args),
+                    handle_event(Mod, client_timeout, [receiving_headers], Args),
                     gen_tcp:close(Socket),
                     exit(normal)
             end
@@ -398,11 +398,11 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
                         {ok, Data} ->
                             {<<Buffer/binary, Data/binary>>, <<>>};
                         {error, closed} ->
-                            Mod:handle_event(client_closed, [receiving_body], Args),
+                            handle_event(Mod, client_closed, [receiving_body], Args),
                             ok = gen_tcp:close(Socket),
                             exit(normal);
                         {error, timeout} ->
-                            Mod:handle_event(client_timeout, [receiving_body], Args),
+                            handle_event(Mod, client_timeout, [receiving_body], Args),
                             ok = gen_tcp:close(Socket),
                             exit(normal)
                     end;
@@ -420,7 +420,7 @@ ensure_binary(Atom) when is_atom(Atom) -> atom_to_binary(Atom, latin1).
 check_max_size(Socket, ContentLength, Buffer, Opts, {Mod, Args}) ->
     case ContentLength > max_body_size(Opts) of
         true ->
-            Mod:handle_event(bad_request, [{body_size, ContentLength}], Args),
+            handle_event(Mod, bad_request, [{body_size, ContentLength}], Args),
 
             %% To send a response, we must first receive anything the
             %% client is sending. To avoid allowing clients to use all
