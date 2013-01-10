@@ -222,16 +222,25 @@ execute_callback(Req, {Mod, Args}) ->
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             {response, ResponseCode, Headers, Body};
         throw:Exc ->
-            Mod:handle_event(request_throw, [Req, Exc, erlang:get_stacktrace()], Args),
+            handle_event(Mod, request_throw, [Req, Exc, erlang:get_stacktrace()], Args),
             {response, 500, [], <<"Internal server error">>};
         error:Error ->
-            Mod:handle_event(request_error, [Req, Error, erlang:get_stacktrace()], Args),
+            handle_event(Mod, request_error, [Req, Error, erlang:get_stacktrace()], Args),
             {response, 500, [], <<"Internal server error">>};
         exit:Exit ->
-            Mod:handle_event(request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
+            handle_event(Mod, request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
             {response, 500, [], <<"Internal server error">>}
     end.
 
+handle_event(Mod, Name, EventArgs, ElliArgs) ->
+    try
+        Mod:handle_event(Name, EventArgs, ElliArgs)
+    catch
+        EvClass:EvError ->
+            error_logger:error_msg("~p:handle_event/3 crashed ~p:~p ~p",
+                                   [Mod, EvClass, EvError,
+                                    erlang:get_stacktrace()])
+    end.
 
 %%
 %% CHUNKED-TRANSFER
