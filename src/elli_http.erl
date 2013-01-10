@@ -237,7 +237,7 @@ handle_event(Mod, Name, EventArgs, ElliArgs) ->
         Mod:handle_event(Name, EventArgs, ElliArgs)
     catch
         EvClass:EvError ->
-            error_logger:error_msg("~p:handle_event/3 crashed ~p:~p ~p",
+            error_logger:error_msg("~p:handle_event/3 crashed ~p:~p~n~p",
                                    [Mod, EvClass, EvError,
                                     erlang:get_stacktrace()])
     end.
