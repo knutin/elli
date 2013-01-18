@@ -6,7 +6,8 @@ Elli is a webserver you can run inside your Erlang application to
 expose an HTTP API. Elli is a aimed exclusively at building
 high-throughput, low-latency HTTP APIs. If robustness and performance
 is more important than general purpose features, then `elli` might be
-for you.
+for you. If you find yourself digging into the implementation of a
+webserver, `elli` might be for you.
 
 Elli is used in production at Wooga.
 
@@ -14,22 +15,38 @@ Elli is used in production at Wooga.
 
 Here's the features Elli *does* have:
 
- * Rack-style request-response allowing "middlewares" to implement
-   useful features like compression, encoding, stats
+ * Rack-style request-response. Your handler function gets a complete
+   request and returns a complete response. There's no messaging, no
+   receiving data directly from the socket, no writing responses
+   directly to the socket. It's a very simple straightforward
+   API. Have a look at `src/elli_example_callback.erl` for examples.
 
- * Short-circuiting of responses with `throw`
+ * Middlewares allows you to add useful features like compression,
+   encoding, stats, but only have it used when needed. No features you
+   don't use on the critical path.
 
- * Many acceptors waiting for a client, handling the lifecycle of that
-   connection, everything including the user code runs in one process
-   to reduce overhead
+ * Short-circuiting of responses using exceptions, allows you to use
+   "assertions" that return for example 403 permission
+   denied. `is_allowed(Req) orelse throw({403, [], <<"Permission
+   denied">>})`.
 
- * Binaries everywhere for strings, response may be iolist
+ * Every client connection gets its own process, isolating the failure
+   of a request from another. For the duration of the connection, only
+   one process is involved, resulting in very robust and efficient
+   code.
 
- * Instrumentation with user callbacks for events like client
-   unexpectedly closed connection, request completed with timing
-   details
+ * Binaries everywhere for strings.
 
- * Keep alive
+ * Instrumentation inside the core of the webserver, calling user
+   callbacks. For example when a request completes, the user callback
+   gets the `request_complete` event which contains timings of all the
+   different parts of handling a request. There's also events for
+   clients unexpectedly closing a connection, crashes in the user
+   callback, etc.
+
+ * Keep alive, using one Erlang process per connection only active
+   when there is a request from the client. Number of connections is
+   only limited by RAM and CPU.
 
  * Chunked transfer in responses for real-time push to clients
 
