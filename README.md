@@ -43,6 +43,7 @@ Here's the features Elli *does* have:
  * Basic auth: https://github.com/martinrehfeld/elli_basicauth
  * Static content: https://github.com/chrisavl/elli_fileserve
  * "Date" header: https://github.com/knutin/elli_date
+ * Cookies: https://github.com/drfloob/elli_cookie
 
 
 ## About
