@@ -73,8 +73,8 @@ init([Opts]) ->
     CallbackArgs   = proplists:get_value(callback_args, Opts),
     IPAddress      = proplists:get_value(ip, Opts, {0,0,0,0}),
     Port           = proplists:get_value(port, Opts, 8080),
+    ListenOpts     = proplists:get_value(listen_opts, Opts, []),
     MinAcceptors   = proplists:get_value(min_acceptors, Opts, 20),
-
     AcceptTimeout  = proplists:get_value(accept_timeout, Opts, 10000),
     RequestTimeout = proplists:get_value(request_timeout, Opts, 60000),
     HeaderTimeout  = proplists:get_value(header_timeout, Opts, 10000),
@@ -92,13 +92,13 @@ init([Opts]) ->
     %% tables, etc.
     ok = Callback:handle_event(elli_startup, [], CallbackArgs),
 
-    {ok, Socket} = gen_tcp:listen(Port, [binary,
-                                         {ip, IPAddress},
-                                         {reuseaddr, true},
-                                         {backlog, 32768},
-                                         {packet, raw},
-                                         {active, false}
-                                        ]),
+    {ok, Socket} = elli_tcp:listen(Port, [binary,
+                                          {ip, IPAddress},
+                                          {reuseaddr, true},
+                                          {backlog, 32768},
+                                          {packet, raw},
+                                          {active, false}
+                                         ] ++ ListenOpts),
     Acceptors = [elli_http:start_link(self(), Socket, Options,
                                       {Callback, CallbackArgs})
                  || _ <- lists:seq(1, MinAcceptors)],

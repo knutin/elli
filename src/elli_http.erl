@@ -1,6 +1,6 @@
 %% @doc: Elli HTTP request implementation
 %%
-%% An elli_http process blocks in gen_tcp:accept/2 until a client
+%% An elli_http process blocks in elli_tcp:accept/2 until a client
 %% connects. It then handles requests on that connection until it's
 %% closed either by the client timing out or explicitly by the user.
 -module(elli_http).
@@ -27,7 +27,7 @@ start_link(Server, ListenSocket, Options, Callback) ->
 %% transfer. If accept doesn't give us a socket within 10 seconds, we
 %% loop to allow code upgrades.
 accept(Server, ListenSocket, Options, Callback) ->
-    case catch gen_tcp:accept(ListenSocket, accept_timeout(Options)) of
+    case catch elli_tcp:accept(ListenSocket, accept_timeout(Options)) of
         {ok, Socket} ->
             t(accepted),
             gen_server:cast(Server, accepted),
@@ -53,7 +53,7 @@ keepalive_loop(Socket, NumRequests, Buffer, Options, Callback) ->
         {keep_alive, NewBuffer} ->
             ?MODULE:keepalive_loop(Socket, NumRequests, NewBuffer, Options, Callback);
         {close, _} ->
-            gen_tcp:close(Socket),
+            elli_tcp:close(Socket),
             ok
     end.
 
@@ -136,7 +136,7 @@ mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
             handle_event(Mod, request_parse_error,
                          [{Reason, {Method, RawPath}}], Args),
             send_bad_request(Socket),
-            gen_tcp:close(Socket),
+            elli_tcp:close(Socket),
             exit(normal)
     end.
 
@@ -154,7 +154,7 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
                 encode_headers(Headers), <<"\r\n">>,
                 Body],
 
-    case gen_tcp:send(Socket, Response) of
+    case elli_tcp:send(Socket, Response) of
         ok -> ok;
         {error, closed} ->
             handle_event(Mod, client_closed, [before_response], Args),
@@ -174,9 +174,9 @@ send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
 
     case file:open(Filename, [read, raw, binary]) of
         {ok, Fd} ->
-            try gen_tcp:send(Socket, ResponseHeaders) of
+            try elli_tcp:send(Socket, ResponseHeaders) of
                 ok ->
-                    case file:sendfile(Fd, Socket, Offset, Length, []) of
+                    case elli_tcp:sendfile(Fd, Socket, Offset, Length, []) of
                         {ok, _BytesSent} ->
                             ok;
                         {error, closed} ->
@@ -200,7 +200,7 @@ send_bad_request(Socket) ->
     Response = [<<"HTTP/1.1 ">>, status(400), <<"\r\n">>,
                <<"Content-Length: ">>, integer_to_list(size(Body)), <<"\r\n">>,
                 <<"\r\n">>],
-    gen_tcp:send(Socket, Response).
+    elli_tcp:send(Socket, Response).
 
 %% @doc: Executes the user callback, translating failure into a proper
 %% response.
@@ -254,7 +254,7 @@ handle_event(Mod, Name, EventArgs, ElliArgs) ->
 start_chunk_loop(Socket) ->
     %% Set the socket to active so we receive the tcp_closed message
     %% if the client closes the connection
-    inet:setopts(Socket, [{active, once}]),
+    elli_tcp:setopts(Socket, [{active, once}]),
     ?MODULE:chunk_loop(Socket).
 
 chunk_loop(Socket) ->
@@ -263,17 +263,17 @@ chunk_loop(Socket) ->
             {error, client_closed};
 
         {chunk, <<>>} ->
-            case gen_tcp:send(Socket, <<"0\r\n\r\n">>) of
+            case elli_tcp:send(Socket, <<"0\r\n\r\n">>) of
                 ok ->
-                    gen_tcp:close(Socket),
+                    elli_tcp:close(Socket),
                     ok;
                 {error, closed} ->
                     {error, client_closed}
             end;
         {chunk, <<>>, From} ->
-            case gen_tcp:send(Socket, <<"0\r\n\r\n">>) of
+            case elli_tcp:send(Socket, <<"0\r\n\r\n">>) of
                 ok ->
-                    gen_tcp:close(Socket),
+                    elli_tcp:close(Socket),
                     From ! {self(), ok},
                     ok;
                 {error, closed} ->
@@ -300,7 +300,7 @@ chunk_loop(Socket) ->
 send_chunk(Socket, Data) ->
     Size = integer_to_list(iolist_size(Data), 16),
     Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
-    gen_tcp:send(Socket, Response).
+    elli_tcp:send(Socket, Response).
 
 
 %%
@@ -311,17 +311,17 @@ send_chunk(Socket, Data) ->
 get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
     case erlang:decode_packet(http_bin, Buffer, []) of
         {more, _} ->
-            case gen_tcp:recv(Socket, 0, request_timeout(Options)) of
+            case elli_tcp:recv(Socket, 0, request_timeout(Options)) of
                 {ok, Data} ->
                     NewBuffer = <<Buffer/binary, Data/binary>>,
                     get_request(Socket, NewBuffer, Options, Callback);
                 {error, timeout} ->
                     handle_event(Mod, request_timeout, [], Args),
-                    gen_tcp:close(Socket),
+                    elli_tcp:close(Socket),
                     exit(normal);
                 {error, closed} ->
                     handle_event(Mod, request_closed, [], Args),
-                    gen_tcp:close(Socket),
+                    elli_tcp:close(Socket),
                     exit(normal)
             end;
         {ok, {http_request, Method, RawPath, Version}, Rest} ->
@@ -329,7 +329,7 @@ get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
         {ok, {http_error, _}, _} ->
             handle_event(Mod, request_parse_error, [Buffer], Args),
             send_bad_request(Socket),
-            gen_tcp:close(Socket),
+            elli_tcp:close(Socket),
             exit(normal)
     end.
 
@@ -344,7 +344,7 @@ get_headers(Socket, _, Headers, HeadersCount, _Opts, {Mod, Args})
   when HeadersCount >= 100 ->
     handle_event(Mod, bad_request, [{too_many_headers, Headers}], Args),
     send_bad_request(Socket),
-    gen_tcp:close(Socket),
+    elli_tcp:close(Socket),
     exit(normal);
 get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback) ->
     case erlang:decode_packet(httph_bin, Buffer, []) of
@@ -354,17 +354,17 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
         {ok, http_eoh, Rest} ->
             {Headers, Rest};
         {more, _} ->
-            case gen_tcp:recv(Socket, 0, header_timeout(Opts)) of
+            case elli_tcp:recv(Socket, 0, header_timeout(Opts)) of
                 {ok, Data} ->
                     get_headers(Socket, <<Buffer/binary, Data/binary>>,
                                 Headers, HeadersCount, Opts, Callback);
                 {error, closed} ->
                     handle_event(Mod, client_closed, [receiving_headers], Args),
-                    gen_tcp:close(Socket),
+                    elli_tcp:close(Socket),
                     exit(normal);
                 {error, timeout} ->
                     handle_event(Mod, client_timeout, [receiving_headers], Args),
-                    gen_tcp:close(Socket),
+                    elli_tcp:close(Socket),
                     exit(normal)
             end
     end.
@@ -394,16 +394,16 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
                 0 ->
                     {Buffer, <<>>};
                 N when N > 0 ->
-                    case gen_tcp:recv(Socket, N, body_timeout(Opts)) of
+                    case elli_tcp:recv(Socket, N, body_timeout(Opts)) of
                         {ok, Data} ->
                             {<<Buffer/binary, Data/binary>>, <<>>};
                         {error, closed} ->
                             handle_event(Mod, client_closed, [receiving_body], Args),
-                            ok = gen_tcp:close(Socket),
+                            ok = elli_tcp:close(Socket),
                             exit(normal);
                         {error, timeout} ->
                             handle_event(Mod, client_timeout, [receiving_body], Args),
-                            ok = gen_tcp:close(Socket),
+                            ok = elli_tcp:close(Socket),
                             exit(normal)
                     end;
                 _ ->
@@ -430,13 +430,13 @@ check_max_size(Socket, ContentLength, Buffer, Opts, {Mod, Args}) ->
             case ContentLength < max_body_size(Opts) * 2 of
                 true ->
                     OnSocket = ContentLength - size(Buffer),
-                    gen_tcp:recv(Socket, OnSocket, 60000),
+                    elli_tcp:recv(Socket, OnSocket, 60000),
                     Response = [<<"HTTP/1.1 ">>, status(413), <<"\r\n">>,
                                 <<"Content-Length: 0">>, <<"\r\n\r\n">>],
-                    gen_tcp:send(Socket, Response),
-                    gen_tcp:close(Socket);
+                    elli_tcp:send(Socket, Response),
+                    elli_tcp:close(Socket);
                 false ->
-                    gen_tcp:close(Socket)
+                    elli_tcp:close(Socket)
             end,
 
             exit(normal);
