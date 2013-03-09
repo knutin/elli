@@ -1,5 +1,13 @@
+%% @doc: Response compression as Elli middleware. Postprocesses all
+%% requests and compresses bodies larger than compress_byte_size (1024
+%% by default).
+
 -module(elli_middleware_compress).
 -export([postprocess/3]).
+
+%%
+%% Postprocess handler
+%%
 
 postprocess(Req, {ResponseCode, Body}, Config)
   when is_integer(ResponseCode) orelse ResponseCode =:= ok ->
@@ -23,9 +31,9 @@ postprocess(Req, {ResponseCode, Headers, Body} = Res, Config)
 postprocess(_, Res, _) ->
     Res.
 
-
-
-
+%%
+%% INTERNALS
+%%
 
 compress(Body, Req) ->
     case accepted_encoding(Req) of
@@ -33,8 +41,6 @@ compress(Body, Req) ->
         <<"deflate">> = E -> {zlib:compress(Body), E};
         _                 -> no_compress
     end.
-
-
 
 accepted_encoding(Req) ->
     Encodings = binary:split(
@@ -45,6 +51,6 @@ accepted_encoding(Req) ->
         [E|_] -> E
     end.
 
-should_compress(Body, S) when byte_size(Body) >= S -> true;
-should_compress(_, _)                              -> false.
-
+should_compress(Body, S) ->
+    is_binary(Body) andalso byte_size(Body) >= S orelse
+        is_list(Body) andalso iolist_size(Body) >= S.

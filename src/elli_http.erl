@@ -5,10 +5,13 @@
 %% closed either by the client timing out or explicitly by the user.
 -module(elli_http).
 -include("../include/elli.hrl").
+-include("../include/elli_util.hrl").
 
 
 %% API
 -export([start_link/4]).
+
+-export([send_response/4]).
 
 -export([mk_req/7]). %% useful when testing.
 
@@ -17,15 +20,15 @@
          parse_path/1, keepalive_loop/3, keepalive_loop/5]).
 
 
--spec start_link(pid(), port(), proplists:proplist(), callback()) -> pid().
+-spec start_link(pid(), elli_tcp:socket(), proplists:proplist(), callback()) -> pid().
 start_link(Server, ListenSocket, Options, Callback) ->
-    spawn_link(?MODULE, accept, [Server, ListenSocket, Options, Callback]).
+    proc_lib:spawn_link(?MODULE, accept, [Server, ListenSocket, Options, Callback]).
 
--spec accept(pid(), port(), proplists:proplist(), callback()) -> ok.
+-spec accept(pid(), elli_tcp:socket(), proplists:proplist(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
 %% request, then loops if we're using keep alive or chunked
-%% transfer. If accept doesn't give us a socket within 10 seconds, we
-%% loop to allow code upgrades.
+%% transfer. If accept doesn't give us a socket within a configurable
+%% timeout, we loop to allow code upgrades of this module.
 accept(Server, ListenSocket, Options, Callback) ->
     case catch elli_tcp:accept(ListenSocket, accept_timeout(Options)) of
         {ok, Socket} ->
@@ -57,93 +60,91 @@ keepalive_loop(Socket, NumRequests, Buffer, Options, Callback) ->
             ok
     end.
 
--spec handle_request(port(), binary(), proplists:proplist(), callback()) ->
+-spec handle_request(elli_tcp:socket(), binary(), proplists:proplist(), callback()) ->
                             {'keep_alive' | 'close', binary()}.
 %% @doc: Handle a HTTP request that will possibly come on the
 %% socket. Returns the appropriate connection token and any buffer
 %% containing (parts of) the next request.
 handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
     {Method, RawPath, V, B0} = get_request(S, PrevB, Opts, Callback), t(request_start),
-    {RequestHeaders, B1} = get_headers(S, V, B0, Opts, Callback),       t(headers_end),
-    {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback),   t(body_end),
+    {RequestHeaders, B1} = get_headers(S, V, B0, Opts, Callback),     t(headers_end),
 
-    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, S, Callback),
+    Req = mk_req(Method, RawPath, RequestHeaders, <<>>, V, S, Callback),
 
-    t(user_start),
-    case execute_callback(Req, Callback) of
-        {response, ResponseCode, UserHeaders, UserBody} ->
+    case init(Req) of
+        {ok, standard} ->
+            {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback), t(body_end),
+            Req1 = Req#req{body = RequestBody},
+
+            t(user_start),
+            Response = execute_callback(Req1),
             t(user_end),
 
-            ResponseHeaders = [connection(Req, UserHeaders),
-                               content_length(UserHeaders, UserBody)
-                               | UserHeaders],
-            send_response(S, Method, ResponseCode,
-                          ResponseHeaders, UserBody, Callback),
+            handle_response(Req1, B2, Response);
+        {ok, handover} ->
+            Req1 = Req#req{body = B1},
 
-            t(request_end),
-            handle_event(Mod, request_complete,
-                         [Req, ResponseCode, ResponseHeaders, UserBody, get_timings()],
-                         Args),
-
-            {close_or_keepalive(Req, UserHeaders), B2};
-
-        {chunk, UserHeaders, Initial} ->
+            t(user_start),
+            Response = Mod:handle(Req1, Args),
             t(user_end),
 
-            ResponseHeaders = [{<<"Transfer-Encoding">>, <<"chunked">>},
-                               connection(Req, UserHeaders)
-                               | UserHeaders],
-            send_response(S, Method, 200, ResponseHeaders, <<"">>, Callback),
-            Initial =:= <<"">> orelse send_chunk(S, Initial),
-
-            ClosingEnd = case start_chunk_loop(S) of
-                             {error, client_closed} -> client;
-                             ok -> server
-                         end,
-
             t(request_end),
-            handle_event(Mod, chunk_complete,
-                         [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
-                         Args),
-            {close, <<>>};
-
-        {file, ResponseCode, UserHeaders, Filename, Range} ->
-            t(user_end),
-
-            ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
-            send_file(S, ResponseCode, ResponseHeaders, Filename, Range, Callback),
-
-            t(request_end),
-
-            handle_event(Mod, request_complete,
-                         [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
-                         Args),
-
-            {close_or_keepalive(Req, UserHeaders), B2}
+            handle_event(Mod, request_complete, [Req1, handover, [], <<>>, get_timings()], Args),
+            Response
     end.
 
--spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()}, RequestHeaders::headers(),
-             RequestBody::body(), V::version(), Socket::inet:socket() | undefined,
-             Callback::callback()) -> record(req).
-mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
-    {Mod, Args} = Callback,
-    case parse_path(RawPath) of
-        {ok, {Path, URL, URLArgs}} ->
-            #req{method = Method, path = URL, args = URLArgs, version = V,
-                 raw_path = Path, headers = RequestHeaders,
-                 body = RequestBody, pid = self(), socket = Socket};
-        {error, Reason} ->
-            handle_event(Mod, request_parse_error,
-                         [{Reason, {Method, RawPath}}], Args),
-            send_bad_request(Socket),
-            elli_tcp:close(Socket),
-            exit(normal)
-    end.
+handle_response(Req, Buffer, {response, Code, UserHeaders, Body}) ->
+    #req{callback = {Mod, Args}} = Req,
+
+    Headers = [connection(Req, UserHeaders),
+               content_length(UserHeaders, Body)
+               | UserHeaders],
+    send_response(Req, Code, Headers, Body),
+
+    t(request_end),
+    handle_event(Mod, request_complete, [Req, Code, Headers, Body, get_timings()], Args),
+
+    {close_or_keepalive(Req, UserHeaders), Buffer};
+
+
+handle_response(Req, _Buffer, {chunk, UserHeaders, Initial}) ->
+    #req{callback = {Mod, Args}} = Req,
+
+    ResponseHeaders = [{<<"Transfer-Encoding">>, <<"chunked">>},
+                       connection(Req, UserHeaders)
+                       | UserHeaders],
+    send_response(Req, 200, ResponseHeaders, <<"">>),
+    Initial =:= <<"">> orelse send_chunk(Req#req.socket, Initial),
+
+    ClosingEnd = case start_chunk_loop(Req#req.socket) of
+                     {error, client_closed} -> client;
+                     ok -> server
+                 end,
+
+    t(request_end),
+    handle_event(Mod, chunk_complete,
+                 [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
+                 Args),
+    {close, <<>>};
+
+handle_response(Req, Buffer, {file, ResponseCode, UserHeaders, Filename, Range}) ->
+    #req{callback = {Mod, Args}} = Req,
+
+    ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
+    send_file(Req, ResponseCode, ResponseHeaders, Filename, Range),
+
+    t(request_end),
+    handle_event(Mod, request_complete,
+                 [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
+                 Args),
+
+    {close_or_keepalive(Req, UserHeaders), Buffer}.
+
 
 
 %% @doc: Generates a HTTP response and sends it to the client
-send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
-    Body = case {Method, Code} of
+send_response(Req, Code, Headers, UserBody) ->
+    Body = case {Req#req.method, Code} of
                {'HEAD', _} -> <<>>;
                {_, 304}    -> <<>>;
                {_, 204}    -> <<>>;
@@ -154,35 +155,37 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
                 encode_headers(Headers), <<"\r\n">>,
                 Body],
 
-    case elli_tcp:send(Socket, Response) of
+    case elli_tcp:send(Req#req.socket, Response) of
         ok -> ok;
-        {error, closed} ->
+        {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
+            #req{callback = {Mod, Args}} = Req,
             handle_event(Mod, client_closed, [before_response], Args),
             ok
     end.
 
 
--spec send_file(Socket::inet:socket(), Code::response_code(), Headers::headers(),
-                Filename::file:filename(), Range::range(),
-                Callback::callback()) -> ok.
+-spec send_file(Request::#req{}, Code::response_code(), Headers::headers(),
+                Filename::file:filename(), Range::range()) -> ok.
+
 %% @doc: Sends a HTTP response to the client where the body is the
-%% contents of the given file.  Assumes correctly set response code &
-%% headers.
-send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
+%% contents of the given file.  Assumes correctly set response code
+%% and headers.
+send_file(Req, Code, Headers, Filename, {Offset, Length}) ->
+    #req{callback = {Mod, Args}} = Req,
     ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                        encode_headers(Headers), <<"\r\n">>],
 
     case file:open(Filename, [read, raw, binary]) of
         {ok, Fd} ->
-            try elli_tcp:send(Socket, ResponseHeaders) of
+            try elli_tcp:send(Req#req.socket, ResponseHeaders) of
                 ok ->
-                    case elli_tcp:sendfile(Fd, Socket, Offset, Length, []) of
+                    case elli_tcp:sendfile(Fd, Req#req.socket, Offset, Length, []) of
                         {ok, _BytesSent} ->
                             ok;
-                        {error, closed} ->
+                        {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                             handle_event(Mod, client_closed, [before_response], Args)
                     end;
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     handle_event(Mod, client_closed, [before_response], Args)
             after
                 file:close(Fd)
@@ -204,7 +207,7 @@ send_bad_request(Socket) ->
 
 %% @doc: Executes the user callback, translating failure into a proper
 %% response.
-execute_callback(Req, {Mod, Args}) ->
+execute_callback(#req{callback = {Mod, Args}} = Req) ->
     try Mod:handle(Req, Args) of
         {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename, {0, 0}};
         {ok, Headers, {file, Filename, Range}}-> {file, 200, Headers, Filename, Range};
@@ -232,16 +235,6 @@ execute_callback(Req, {Mod, Args}) ->
             {response, 500, [], <<"Internal server error">>}
     end.
 
-handle_event(Mod, Name, EventArgs, ElliArgs) ->
-    try
-        Mod:handle_event(Name, EventArgs, ElliArgs)
-    catch
-        EvClass:EvError ->
-            error_logger:error_msg("~p:handle_event/3 crashed ~p:~p~n~p",
-                                   [Mod, EvClass, EvError,
-                                    erlang:get_stacktrace()])
-    end.
-
 %%
 %% CHUNKED-TRANSFER
 %%
@@ -267,7 +260,7 @@ chunk_loop(Socket) ->
                 ok ->
                     elli_tcp:close(Socket),
                     ok;
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     {error, client_closed}
             end;
         {chunk, <<>>, From} ->
@@ -276,7 +269,7 @@ chunk_loop(Socket) ->
                     elli_tcp:close(Socket),
                     From ! {self(), ok},
                     ok;
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     From ! {self(), {error, closed}},
                     ok
             end;
@@ -288,7 +281,7 @@ chunk_loop(Socket) ->
             case send_chunk(Socket, Data) of
                 ok ->
                     From ! {self(), ok};
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     From ! {self(), {error, closed}}
             end,
             ?MODULE:chunk_loop(Socket)
@@ -319,7 +312,7 @@ get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
                     handle_event(Mod, request_timeout, [], Args),
                     elli_tcp:close(Socket),
                     exit(normal);
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     handle_event(Mod, request_closed, [], Args),
                     elli_tcp:close(Socket),
                     exit(normal)
@@ -330,10 +323,13 @@ get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
             handle_event(Mod, request_parse_error, [Buffer], Args),
             send_bad_request(Socket),
             elli_tcp:close(Socket),
+            exit(normal);
+        {ok, {http_response, _, _, _}, _} ->
+            elli_tcp:close(Socket),
             exit(normal)
     end.
 
--spec get_headers(port(), version(), binary(), proplists:proplist(), callback()) ->
+-spec get_headers(elli_tcp:socket(), version(), binary(), proplists:proplist(), callback()) ->
                          {headers(), any()}.
 get_headers(_Socket, {0, 9}, _, _, _) ->
     {[], <<>>};
@@ -353,12 +349,14 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
             get_headers(Socket, Rest, NewHeaders, HeadersCount + 1, Opts, Callback);
         {ok, http_eoh, Rest} ->
             {Headers, Rest};
+        {ok, {http_error, _}, Rest} ->
+            get_headers(Socket, Rest, Headers, HeadersCount, Opts, Callback);
         {more, _} ->
             case elli_tcp:recv(Socket, 0, header_timeout(Opts)) of
                 {ok, Data} ->
                     get_headers(Socket, <<Buffer/binary, Data/binary>>,
                                 Headers, HeadersCount, Opts, Callback);
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     handle_event(Mod, client_closed, [receiving_headers], Args),
                     elli_tcp:close(Socket),
                     exit(normal);
@@ -369,7 +367,7 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
             end
     end.
 
--spec get_body(port(), headers(), binary(),
+-spec get_body(elli_tcp:socket(), headers(), binary(),
                proplists:proplist(), callback()) -> {body(), binary()}.
 %% @doc: Fetches the full body of the request, if any is available.
 %%
@@ -386,7 +384,8 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
         undefined ->
             {<<>>, Buffer};
         ContentLengthBin ->
-            ContentLength = ?b2i(ContentLengthBin),
+            ContentLength = ?b2i(binary:replace(ContentLengthBin,
+                                                <<" ">>, <<>>, [global])),
 
             ok = check_max_size(Socket, ContentLength, Buffer, Opts, Callback),
 
@@ -397,7 +396,7 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
                     case elli_tcp:recv(Socket, N, body_timeout(Opts)) of
                         {ok, Data} ->
                             {<<Buffer/binary, Data/binary>>, <<>>};
-                        {error, closed} ->
+                        {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                             handle_event(Mod, client_closed, [receiving_body], Args),
                             ok = elli_tcp:close(Socket),
                             exit(normal);
@@ -444,6 +443,25 @@ check_max_size(Socket, ContentLength, Buffer, Opts, {Mod, Args}) ->
             ok
     end.
 
+-spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()},
+             RequestHeaders::headers(), RequestBody::body(), V::version(),
+             Socket::elli_tcp:socket() | undefined, Callback::callback()) ->
+                    record(req).
+mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
+    {Mod, Args} = Callback,
+    case parse_path(RawPath) of
+        {ok, {Path, URL, URLArgs}} ->
+            #req{method = Method, path = URL, args = URLArgs, version = V,
+                 raw_path = Path, headers = RequestHeaders,
+                 body = RequestBody, pid = self(), socket = Socket,
+                 callback = Callback};
+        {error, Reason} ->
+            handle_event(Mod, request_parse_error,
+                         [{Reason, {Method, RawPath}}], Args),
+            send_bad_request(Socket),
+            elli_tcp:close(Socket),
+            exit(normal)
+    end.
 
 %%
 %% HEADERS
@@ -501,11 +519,11 @@ connection(Req, UserHeaders) ->
     end.
 
 content_length(Headers, Body)->
-    case proplists:get_value(<<"Content-Length">>, Headers) of
-        undefined ->
-            {<<"Content-Length">>, iolist_size(Body)};
-        ContentLength ->
-            {<<"Content-Length">>, ContentLength}
+    case proplists:is_defined(<<"Content-Length">>, Headers) of
+        true ->
+            [];
+        false ->
+            {<<"Content-Length">>, iolist_size(Body)}
     end.
 
 %%
@@ -522,11 +540,9 @@ parse_path({absoluteURI, _Scheme, _Host, _Port, Path}) ->
 parse_path(_) ->
     {error, unsupported_uri}.
 
-split_path(<<"/", Path/binary>>) ->
-    binary:split(Path, [<<"/">>], [global, trim]);
 split_path(Path) ->
-    binary:split(Path, [<<"/">>], [global, trim]).
-
+    [P || P <- binary:split(Path, [<<"/">>], [global]),
+          P =/= <<>>].
 
 %% @doc: Splits the url arguments into a proplist. Lifted from
 %% cowboy_http:x_www_form_urlencoded/2
@@ -540,6 +556,33 @@ split_args(Qs) ->
 		[Name, Value] -> {Name, Value}
 	end || Token <- Tokens].
 
+
+%%
+%% CALLBACK HELPERS
+%%
+
+init(#req{callback = {Mod, Args}} = Req) ->
+    case erlang:function_exported(Mod, init, 2) of
+        true ->
+            case Mod:init(Req, Args) of
+                ignore ->
+                    {ok, standard};
+                {ok, Behaviour} ->
+                    {ok, Behaviour}
+            end;
+        false ->
+            {ok, standard}
+    end.
+
+handle_event(Mod, Name, EventArgs, ElliArgs) ->
+    try
+        Mod:handle_event(Name, EventArgs, ElliArgs)
+    catch
+        EvClass:EvError ->
+            error_logger:error_msg("~p:handle_event/3 crashed ~p:~p~n~p",
+                                   [Mod, EvClass, EvError,
+                                    erlang:get_stacktrace()])
+    end.
 
 %%
 %% TIMING HELPERS
@@ -633,3 +676,21 @@ status(506) -> <<"506 Variant Also Negotiates">>;
 status(507) -> <<"507 Insufficient Storage">>;
 status(510) -> <<"510 Not Extended">>;
 status(B) when is_binary(B) -> B.
+
+
+%%
+%% UNIT TESTS
+%%
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+get_body_test() ->
+    Socket = socket,
+    Headers = [{<<"Content-Length">>, <<" 42 ">>}],
+    Buffer = binary:copy(<<".">>, 42),
+    Opts = [],
+    Callback = {no, op},
+    ?assertEqual({Buffer, <<>>},
+                 get_body(Socket, Headers, Buffer, Opts, Callback)).
+-endif.

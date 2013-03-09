@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v1.0
+
+ * SSL using built-in ssl from Erlang/OTP. Thanks to Maas-Maarten Zeeman.
+
+ * "Handover" a socket to user code, making it possible to implement
+   WebSockets(https://github.com/mmzeeman/elli_websocket
+
+ * Type fixes from Ingo Struck and Andreas Hasselberg.
+
+## v0.4.1
+
+ * Fix from Christian Lundgren for browsers that include spaces in the
+   value of the Content-Length header.
+
 ## v0.4
 
  * Added support for sending ranges of a file with sendfile by

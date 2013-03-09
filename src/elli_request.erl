@@ -1,5 +1,6 @@
 -module(elli_request).
 -include("../include/elli.hrl").
+-include("elli_util.hrl").
 
 -export([send_chunk/2
          , async_send_chunk/2
@@ -22,6 +23,7 @@
          , get_range/1
          , get_header/3
          , to_proplist/1
+         , is_request/1
         ]).
 
 %%
@@ -39,7 +41,7 @@ body(#req{body = Body})          -> Body.
 peer(#req{socket = Socket} = Req) ->
     case get_header(<<"X-Forwarded-For">>, Req, undefined) of
         undefined ->
-            case inet:peername(Socket) of
+            case elli_tcp:peername(Socket) of
                 {ok, {Address, _}} ->
                     list_to_binary(inet_parse:ntoa(Address));
                 {error, _} ->
@@ -197,3 +199,6 @@ is_ref_alive(Ref) ->
         true -> is_process_alive(Ref);
         false -> rpc:call(node(Ref), erlang, is_process_alive, [Ref])
     end.
+
+is_request(#req{}) -> true;
+is_request(_)      -> false.

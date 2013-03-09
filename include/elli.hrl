@@ -11,7 +11,9 @@
 -type body() :: binary() | iolist().
 -type response() :: iolist().
 -type http_method() :: 'OPTIONS' | 'GET' | 'HEAD' | 'POST' |
-                       'PUT' | 'DELETE' | 'TRACE'.
+                       'PUT' | 'DELETE' | 'TRACE' | binary().
+                       %% binary for other http methods
+
 -type response_code() :: 100..999.
 -type connection_token_atom() :: keep_alive | close.
 
@@ -21,11 +23,13 @@
 
 -type range() :: {Offset::non_neg_integer(), Length::non_neg_integer()}.
 
--define(l2i(L), list_to_integer(L)).
--define(i2l(I), integer_to_list(I)).
--define(b2i(I), list_to_integer(binary_to_list(I))).
-
 -type timestamp() :: {integer(), integer(), integer()}.
+-type elli_event() :: elli_startup |
+                      bad_request | file_error |
+                      chunk_complete | request_complete |
+                      request_throw | request_error | request_exit |
+                      request_closed | request_parse_error |
+                      client_closed | client_timeout.
 
 -record(req, {
           method :: http_method(),
@@ -36,7 +40,8 @@
           headers :: headers(),
           body :: body(),
           pid :: pid(),
-          socket :: inet:socket()
+          socket :: undefined | elli_tcp:socket(),
+          callback :: callback()
 }).
 
 -define(EXAMPLE_CONF, [{callback, elli_example_callback},

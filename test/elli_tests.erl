@@ -1,6 +1,7 @@
 -module(elli_tests).
 -include_lib("eunit/include/eunit.hrl").
 -include("elli.hrl").
+-include("elli_util.hrl").
 
 
 -define(i2b(I), list_to_binary(integer_to_list(I))).
@@ -15,6 +16,7 @@ elli_test_() ->
       ?_test(crash()),
       ?_test(no_compress()),
       ?_test(exception_flow()),
+      ?_test(accept_content_type()),
       ?_test(user_connection()),
       ?_test(get_args()),
       ?_test(post_args()),
@@ -24,6 +26,7 @@ elli_test_() ->
       ?_test(way_too_big_body()),
       ?_test(bad_request_line()),
       ?_test(content_length()),
+      ?_test(user_content_length()),
       ?_test(chunked()),
       ?_test(sendfile()),
       ?_test(sendfile_range()),
@@ -55,8 +58,7 @@ teardown(Pids) ->
 %%
 
 hello_world() ->
-    URL = "http://localhost:3001/hello/world",
-    {ok, Response} = httpc:request(URL),
+    {ok, Response} = httpc:request("http://localhost:3001/hello/world"),
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "12"}], headers(Response)),
@@ -94,6 +96,14 @@ exception_flow() ->
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "9"}], headers(Response)),
     ?assertEqual("Forbidden", body(Response)).
+
+accept_content_type() ->
+    {ok, Json} = httpc:request(get, {"http://localhost:3001/type?name=knut",
+                                     [{"Accept", "application/json"}]}, [], []),
+    ?assertEqual(<<"{\"name\" : \"knut\"}">>, list_to_binary(body(Json))),
+    {ok, Text} = httpc:request(get, {"http://localhost:3001/type?name=knut",
+                                     [{"Accept", "text/plain"}]}, [], []),
+    ?assertEqual("name: knut", body(Text)).
 
 user_connection() ->
     {ok, Response} = httpc:request("http://localhost:3001/user/defined/behaviour"),
@@ -165,6 +175,18 @@ content_length() ->
                   {"content-length", "7"},
                   {"etag", "foobar"}], headers(Response)),
     ?assertEqual([], body(Response)).
+
+user_content_length() ->
+    Headers = <<"Foo: bar\n\n">>,
+    Client = start_slow_client(3001, "/user/content-length"),
+    send(Client, Headers, 128),
+
+    ?assertEqual({ok, <<"HTTP/1.1 200 OK\r\n"
+                        "Connection: Keep-Alive\r\n"
+                        "Content-Length: 123\r\n"
+                        "\r\n"
+                        "foobar">>},
+                 gen_tcp:recv(Client, 0)).
 
 
 chunked() ->
@@ -261,13 +283,21 @@ get_pipeline() ->
     {ok, Socket} = gen_tcp:connect("127.0.0.1", 3001, [{active, false}, binary]),
     gen_tcp:send(Socket, <<Req/binary, Req/binary>>),
 
-    {ok, Res} = gen_tcp:recv(Socket, 0),
-
     ExpectedResponse = <<"HTTP/1.1 200 OK\r\n"
                          "Connection: Keep-Alive\r\n"
                          "Content-Length: 10\r\n"
                          "\r\n"
                          "Hello elli">>,
+
+    {ok, Res} = gen_tcp:recv(Socket, size(ExpectedResponse) * 2),
+
+    case binary:copy(ExpectedResponse, 2) =:= Res of
+        true ->
+            ok;
+        false ->
+            error_logger:info_msg("Expected: ~p~nResult: ~p~n",
+                                  [binary:copy(ExpectedResponse, 2), Res])
+    end,
 
     ?assertEqual(binary:copy(ExpectedResponse, 2),
                  Res).
@@ -342,7 +372,8 @@ to_proplist_test() ->
                headers = [{<<"Host">>,<<"localhost:3001">>}],
                body = <<>>,
                pid = self(),
-               socket = socket},
+               socket = socket,
+               callback = {mod, []}},
 
     Prop = [{method,'GET'},
             {path,[<<"crash">>]},
@@ -352,8 +383,13 @@ to_proplist_test() ->
             {headers,[{<<"Host">>,<<"localhost:3001">>}]},
             {body,<<>>},
             {pid,self()},
-            {socket,socket}],
+            {socket,socket},
+            {callback, {mod, []}}],
     ?assertEqual(Prop, elli_request:to_proplist(Req)).
+
+is_request_test() ->
+    ?assert(elli_request:is_request(#req{})),
+    ?assertNot(elli_request:is_request({req, foobar})).
 
 
 query_str_test_() ->

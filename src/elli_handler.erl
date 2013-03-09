@@ -1,8 +1,6 @@
 -module(elli_handler).
 -include("elli.hrl").
 
--export([behaviour_info/1]).
-
-behaviour_info(callbacks) ->
-    [{handle, 2},
-     {handle_event, 3}].
+-callback handle(Req :: #req{}, callback_args()) ->
+    ignore | {response_code(), [tuple()], binary()} | {ok, [tuple()], binary()}.
+-callback handle_event(Event :: elli_event(), Args :: [tuple()], Config :: [tuple()]) -> ok.
