@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.4.1
+
+ * Fix from Christian Lundgren for browsers that include spaces in the
+   value of the Content-Length header.
+
 ## v0.4
 
  * Added support for sending ranges of a file with sendfile by
