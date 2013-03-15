@@ -633,3 +633,21 @@ status(506) -> <<"506 Variant Also Negotiates">>;
 status(507) -> <<"507 Insufficient Storage">>;
 status(510) -> <<"510 Not Extended">>;
 status(B) when is_binary(B) -> B.
+
+
+%%
+%% UNIT TESTS
+%%
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+get_body_test() ->
+    Socket = socket,
+    Headers = [{<<"Content-Length">>, <<" 42 ">>}],
+    Buffer = binary:copy(<<".">>, 42),
+    Opts = [],
+    Callback = {no, op},
+    ?assertEqual({Buffer, <<>>},
+                 get_body(Socket, Headers, Buffer, Opts, Callback)).
+-endif.
