@@ -386,7 +386,8 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
         undefined ->
             {<<>>, Buffer};
         ContentLengthBin ->
-            ContentLength = ?b2i(ContentLengthBin),
+            ContentLength = ?b2i(binary:replace(ContentLengthBin,
+                                                <<" ">>, <<>>, [global])),
 
             ok = check_max_size(Socket, ContentLength, Buffer, Opts, Callback),
 
