@@ -45,6 +45,10 @@ accepted_encoding(Req) ->
         [E|_] -> E
     end.
 
-should_compress(Body, S) when byte_size(Body) >= S -> true;
-should_compress(_, _)                              -> false.
+should_compress(Body, S) when is_binary(Body) ->
+    byte_size(Body) >= S;
+should_compress(Body, S) when is_list(Body) ->
+    iolist_size(Body) >= S;
+should_compress(_, _) ->
+    false.
 
