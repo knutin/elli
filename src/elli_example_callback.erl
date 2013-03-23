@@ -124,7 +124,7 @@ handle('GET', [<<"compressed">>], _Req) ->
 handle('GET', [<<"compressed-io_list">>], _Req) ->
     %% Body with a iolist size over 1024 are automatically gzipped by
     %% elli_middleware_compress
-    {ok, lists:flatten(lists:duplicate(86, [<<"Hello World!">>]))};
+    {ok, lists:duplicate(86, [<<"Hello World!">>])};
 
 
 handle('HEAD', [<<"head">>], _Req) ->
