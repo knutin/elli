@@ -267,6 +267,13 @@ get_pipeline() ->
                          "Content-Length: 10\r\n"
                          "\r\n"
                          "Hello elli">>,
+    case binary:copy(ExpectedResponse, 2) =:= Res of
+        true ->
+            ok;
+        false ->
+            error_logger:info_msg("Expected: ~p~nResult: ~p~n",
+                                  [binary:copy(ExpectedResponse, 2), Res])
+    end,
 
     ?assertEqual(binary:copy(ExpectedResponse, 2),
                  Res).
