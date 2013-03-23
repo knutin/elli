@@ -273,13 +273,14 @@ get_pipeline() ->
     {ok, Socket} = gen_tcp:connect("127.0.0.1", 3001, [{active, false}, binary]),
     gen_tcp:send(Socket, <<Req/binary, Req/binary>>),
 
-    {ok, Res} = gen_tcp:recv(Socket, 0),
-
     ExpectedResponse = <<"HTTP/1.1 200 OK\r\n"
                          "Connection: Keep-Alive\r\n"
                          "Content-Length: 10\r\n"
                          "\r\n"
                          "Hello elli">>,
+
+    {ok, Res} = gen_tcp:recv(Socket, size(ExpectedResponse) * 2),
+
     case binary:copy(ExpectedResponse, 2) =:= Res of
         true ->
             ok;
