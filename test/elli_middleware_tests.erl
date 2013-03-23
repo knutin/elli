@@ -41,7 +41,23 @@ compress() ->
     ?assertEqual(200, status(Response1)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "1032"}], headers(Response1)),
-    ?assertEqual(lists:flatten(lists:duplicate(86, "Hello World!")), body(Response1)).
+    ?assertEqual(lists:flatten(lists:duplicate(86, "Hello World!")), body(Response1)),
+
+    {ok, Response2} = httpc:request(get, {"http://localhost:3002/compressed-io_list",
+                                         [{"Accept-Encoding", "gzip"}]}, [], []),
+    ?assertEqual(200, status(Response2)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-encoding", "gzip"},
+                  {"content-length", "41"}], headers(Response2)),
+    ?assertEqual(binary:copy(<<"Hello World!">>, 86), zlib:gunzip(body(Response))),
+
+    {ok, Response3} = httpc:request("http://localhost:3002/compressed-io_list"),
+    ?assertEqual(200, status(Response3)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "1032"}], headers(Response3)),
+    ?assertEqual(lists:flatten(lists:duplicate(86, "Hello World!")), body(Response3)).
+
+
 
 
 
