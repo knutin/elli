@@ -502,11 +502,11 @@ connection(Req, UserHeaders) ->
     end.
 
 content_length(Headers, Body)->
-    case proplists:get_value(<<"Content-Length">>, Headers) of
-        undefined ->
-            {<<"Content-Length">>, iolist_size(Body)};
-        ContentLength ->
-            {<<"Content-Length">>, ContentLength}
+    case proplists:is_defined(<<"Content-Length">>, Headers) of
+        true ->
+            [];
+        false ->
+            {<<"Content-Length">>, iolist_size(Body)}
     end.
 
 %%

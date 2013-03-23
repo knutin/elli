@@ -23,6 +23,7 @@ elli_test_() ->
       ?_test(way_too_big_body()),
       ?_test(bad_request_line()),
       ?_test(content_length()),
+      ?_test(user_content_length()),
       ?_test(chunked()),
       ?_test(sendfile()),
       ?_test(sendfile_range()),
@@ -164,6 +165,18 @@ content_length() ->
                   {"content-length", "7"},
                   {"etag", "foobar"}], headers(Response)),
     ?assertEqual([], body(Response)).
+
+user_content_length() ->
+    Headers = <<"Foo: bar\n\n">>,
+    Client = start_slow_client(3001, "/user/content-length"),
+    send(Client, Headers, 128),
+
+    ?assertEqual({ok, <<"HTTP/1.1 200 OK\r\n"
+                        "Connection: Keep-Alive\r\n"
+                        "Content-Length: 123\r\n"
+                        "\r\n"
+                        "foobar">>},
+                 gen_tcp:recv(Client, 0)).
 
 
 chunked() ->

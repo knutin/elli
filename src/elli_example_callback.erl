@@ -83,6 +83,9 @@ handle('GET',[<<"user">>, <<"defined">>, <<"behaviour">>], _Req) ->
     {304, [{<<"Connection">>, <<"close">>},
            {<<"Content-Length">>, <<"123">>}], <<"ignored">>};
 
+handle('GET', [<<"user">>, <<"content-length">>], _Req) ->
+    {200, [{<<"Content-Length">>, 123}], <<"foobar">>};
+
 handle('GET', [<<"crash">>], _Req) ->
     %% Throwing an exception results in a 500 response and
     %% request_throw being called
