@@ -14,6 +14,7 @@ elli_test_() ->
       ?_test(crash()),
       ?_test(no_compress()),
       ?_test(exception_flow()),
+      ?_test(accept_content_type()),
       ?_test(user_connection()),
       ?_test(get_args()),
       ?_test(post_args()),
@@ -94,6 +95,14 @@ exception_flow() ->
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "9"}], headers(Response)),
     ?assertEqual("Forbidden", body(Response)).
+
+accept_content_type() ->
+    {ok, Json} = httpc:request(get, {"http://localhost:3001/type?name=knut",
+                                     [{"Accept", "application/json"}]}, [], []),
+    ?assertEqual(<<"{\"name\" : \"knut\"}">>, list_to_binary(body(Json))),
+    {ok, Text} = httpc:request(get, {"http://localhost:3001/type?name=knut",
+                                     [{"Accept", "text/plain"}]}, [], []),
+    ?assertEqual("name: knut", body(Text)).
 
 user_connection() ->
     {ok, Response} = httpc:request("http://localhost:3001/user/defined/behaviour"),
