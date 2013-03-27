@@ -166,8 +166,8 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
                 Filename::file:filename(), Range::range(),
                 Callback::callback()) -> ok.
 %% @doc: Sends a HTTP response to the client where the body is the
-%% contents of the given file.  Assumes correctly set response code &
-%% headers.
+%% contents of the given file.  Assumes correctly set response code
+%% and headers.
 send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
     ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                        encode_headers(Headers), <<"\r\n">>],

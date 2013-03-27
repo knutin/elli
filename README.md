@@ -37,7 +37,7 @@ Here's the features Elli *does* have:
 
  * Binaries everywhere for strings.
 
- * Instrumentation inside the core of the webserver, calling user
+ * Instrumentation inside the core of the webserver, triggering user
    callbacks. For example when a request completes, the user callback
    gets the `request_complete` event which contains timings of all the
    different parts of handling a request. There's also events for
@@ -161,8 +161,9 @@ $: erl -pa deps/*/ebin ebin
 
 ## Callback module
 
-There is an [example callback module](https://github.com/knutin/elli/blob/master/src/elli_example_callback.erl)
-distributed with elli that can be used and adopted right away.
+The best source of documentation for how to write a callback module is
+[src/elli_example_callback.erl](https://github.com/knutin/elli/blob/master/src/elli_example_callback.erl). It
+has a bunch of examples used in the tests.
 
 A minimal callback module could look like this:
 
@@ -220,6 +221,3 @@ init([]) ->
     {ok, { {one_for_one, 5, 10}, [ElliSpec]} }.
 
 ```
-
-
-k
