@@ -39,8 +39,18 @@
 handle(CleanReq, Config) ->
     Mods   = mods(Config),
     PreReq = preprocess(CleanReq, Mods),
-    Res    = process(PreReq, Mods),
-    postprocess(PreReq, Res, lists:reverse(Mods)).
+    try process(PreReq, Mods) of
+        Res -> postprocess(PreReq, Res, lists:reverse(Mods))
+    catch
+        throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
+            postprocess(PreReq, {ResponseCode, Headers, Body}, lists:reverse(Mods));
+        throw:Exc ->
+            postprocess(PreReq, {500, [], <<"Internal server error">>}, lists:reverse(Mods));
+        error:Error ->
+            postprocess(PreReq, {500, [], <<"Internal server error">>}, lists:reverse(Mods));
+        exit:Exit ->
+            postprocess(PreReq, {500, [], <<"Internal server error">>}, lists:reverse(Mods))
+    end.
 
 
 handle_event(elli_startup, Args, Config) ->
