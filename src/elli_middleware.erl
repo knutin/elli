@@ -45,10 +45,13 @@ handle(CleanReq, Config) ->
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             postprocess(PreReq, {ResponseCode, Headers, Body}, lists:reverse(Mods));
         throw:Exc ->
+            handle_event(request_throw, [PreReq, Exc, erlang:get_stacktrace()], Config),
             postprocess(PreReq, {500, [], <<"Internal server error">>}, lists:reverse(Mods));
         error:Error ->
+            handle_event(request_error, [PreReq, Error, erlang:get_stacktrace()], Config),
             postprocess(PreReq, {500, [], <<"Internal server error">>}, lists:reverse(Mods));
         exit:Exit ->
+            handle_event(request_exit, [PreReq, Exit, erlang:get_stacktrace()], Config),
             postprocess(PreReq, {500, [], <<"Internal server error">>}, lists:reverse(Mods))
     end.
 

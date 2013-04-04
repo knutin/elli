@@ -73,6 +73,7 @@ error_responses() ->
                                           <<"Internal server error">>)),
     ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response1)),
                                           <<"Request id">>)),
+    ?assert(lists:member(request_throw, helper_events_server:get())),
 
     {ok, Response2} = httpc:request("http://localhost:3002/403"),
     ?assertEqual(403, status(Response2)),
@@ -102,6 +103,7 @@ setup() ->
     application:start(public_key),
     application:start(ssl),
     inets:start(),
+    helper_events_server:start(),
 
     Config = [
               {mods, [
@@ -111,7 +113,8 @@ setup() ->
                       {elli_example_middleware, []},
                       {elli_middleware_compress, []},
                       {elli_middleware_error_responses, []},
-                      {elli_example_callback, []}
+                      {elli_example_callback, []},
+                      {helper_event_handler, []}
                      ]}
              ],
 
@@ -122,6 +125,5 @@ setup() ->
     [P].
 
 teardown(Pids) ->
+    helper_events_server:stop(),
     [elli:stop(P) || P <- Pids].
-
-
