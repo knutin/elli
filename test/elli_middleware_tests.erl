@@ -62,18 +62,24 @@ compress() ->
 error_responses() ->
     {ok, Response} = httpc:request("http://localhost:3002/foobarbaz"),
     ?assertEqual(404, status(Response)),
-    ?assertMatch({match, _Captured}, re:run(body(Response), "Not Found")),
-    ?assertMatch({match, _Captured}, re:run(body(Response), "Request: ")),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response)),
+                                          <<"Not Found">>)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response)),
+                                          <<"Request id">>)),
 
     {ok, Response1} = httpc:request("http://localhost:3002/crash"),
     ?assertEqual(500, status(Response1)),
-    ?assertMatch({match, _Captured}, re:run(body(Response1), "Internal server error")),
-    ?assertMatch({match, _Captured}, re:run(body(Response1), "Request: ")),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response1)),
+                                          <<"Internal server error">>)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response1)),
+                                          <<"Request id">>)),
 
     {ok, Response2} = httpc:request("http://localhost:3002/403"),
     ?assertEqual(403, status(Response2)),
-    ?assertMatch({match, _Captured}, re:run(body(Response2), "Forbidden")),
-    ?assertMatch({match, _Captured}, re:run(body(Response2), "Request: ")).
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response2)),
+                                          <<"Forbidden">>)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response2)),
+                                          <<"Request id">>)).
 
 
 

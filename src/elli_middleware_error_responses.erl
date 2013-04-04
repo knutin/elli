@@ -15,8 +15,7 @@ postprocess(Req, {ResponseCode, Headers, Body} = Res, _Args)
         false ->
             Res;
         true ->
-            Msg = io_lib:format("~nRequest: ~p", [elli_request:to_proplist(Req)]),
-            {ResponseCode, Headers, [Body, Msg]}
+            error_response(Req, Res)
     end;
 postprocess(_, Res, _) ->
     Res.
@@ -27,3 +26,16 @@ postprocess(_, Res, _) ->
 
 is_error(ResponseCode) ->
     ResponseCode >= 400 andalso ResponseCode < 600.
+
+error_response(Req, {ResponseCode, Headers, Body} = Res) ->
+    NewBody = <<"<html>"
+             "<head><title>", Body/binary, "</title></head>"
+             "<body>"
+             "<h1>", Body/binary, "</h1>"
+             "<p>Request id: #", (list_to_binary(
+                                    integer_to_list(
+                                      elli_request:id(Req))))/binary, "</p>"
+             "</body>"
+             "</html>">>,
+
+    {ResponseCode, Headers, NewBody}.

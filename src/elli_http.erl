@@ -226,27 +226,15 @@ execute_callback(Req, {Mod, Args}) ->
             {response, ResponseCode, Headers, Body};
         throw:Exc ->
             handle_event(Mod, request_throw, [Req, Exc, erlang:get_stacktrace()], Args),
-            internal_error_response(Req);
+            {response, 500, [], <<"Internal server error">>};
         error:Error ->
             handle_event(Mod, request_error, [Req, Error, erlang:get_stacktrace()], Args),
-            internal_error_response(Req);
+            {response, 500, [], <<"Internal server error">>};
         exit:Exit ->
             handle_event(Mod, request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
-            internal_error_response(Req)
+            {response, 500, [], <<"Internal server error">>}
     end.
 
-internal_error_response(Req) ->
-    Body = <<"<html>"
-             "<head><title>Internal server error</title></head>"
-             "<body>"
-             "<h1>Internal server error</h1>"
-             "<p>Request id: #", (list_to_binary(
-                                    integer_to_list(
-                                      elli_request:id(Req))))/binary, "</p>"
-             "</body>"
-             "</html>">>,
-
-    {response, 500, [], Body}.
 
 handle_event(Mod, Name, EventArgs, ElliArgs) ->
     try

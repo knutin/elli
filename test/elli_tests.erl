@@ -76,12 +76,8 @@ crash() ->
     {ok, Response} = httpc:request("http://localhost:3001/crash"),
     ?assertEqual(500, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
-                  {"content-length", "142"}], headers(Response)),
-    ?assertNotEqual(nomatch, binary:match(list_to_binary(body(Response)),
-                                          <<"Internal server error">>)),
-    ?assertNotEqual(nomatch, binary:match(list_to_binary(body(Response)),
-                                          <<"Request id">>)).
-
+                  {"content-length", "21"}], headers(Response)),
+    ?assertEqual("Internal server error", body(Response)).
 
 no_compress() ->
     {ok, Response} = httpc:request(get, {"http://localhost:3001/compressed",
