@@ -9,7 +9,8 @@ elli_test_() ->
      [
       ?_test(hello_world()),
       ?_test(short_circuit()),
-      ?_test(compress())
+      ?_test(compress()),
+      ?_test(error_responses())
      ]}.
 
 %%
@@ -58,6 +59,28 @@ compress() ->
     ?assertEqual(lists:flatten(lists:duplicate(86, "Hello World!")), body(Response3)).
 
 
+error_responses() ->
+    {ok, Response} = httpc:request("http://localhost:3002/foobarbaz"),
+    ?assertEqual(404, status(Response)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response)),
+                                          <<"Not Found">>)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response)),
+                                          <<"Request id">>)),
+
+    {ok, Response1} = httpc:request("http://localhost:3002/crash"),
+    ?assertEqual(500, status(Response1)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response1)),
+                                          <<"Internal server error">>)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response1)),
+                                          <<"Request id">>)),
+    ?assert(lists:member(request_throw, helper_events_server:get())),
+
+    {ok, Response2} = httpc:request("http://localhost:3002/403"),
+    ?assertEqual(403, status(Response2)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response2)),
+                                          <<"Forbidden">>)),
+    ?assertNotMatch(nomatch, binary:match(list_to_binary(body(Response2)),
+                                          <<"Request id">>)).
 
 
 
@@ -80,6 +103,7 @@ setup() ->
     application:start(public_key),
     application:start(ssl),
     inets:start(),
+    helper_events_server:start(),
 
     Config = [
               {mods, [
@@ -88,7 +112,9 @@ setup() ->
                                          {port, 514}]},
                       {elli_example_middleware, []},
                       {elli_middleware_compress, []},
-                      {elli_example_callback, []}
+                      {elli_middleware_error_responses, []},
+                      {elli_example_callback, []},
+                      {helper_event_handler, []}
                      ]}
              ],
 
@@ -99,6 +125,5 @@ setup() ->
     [P].
 
 teardown(Pids) ->
+    helper_events_server:stop(),
     [elli:stop(P) || P <- Pids].
-
-
