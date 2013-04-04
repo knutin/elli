@@ -19,6 +19,7 @@
          , peer/1
          , method/1
          , body/1
+         , id/1
          , get_range/1
          , get_header/3
          , to_proplist/1
@@ -35,6 +36,7 @@ raw_path(#req{raw_path = Path})  -> Path.
 headers(#req{headers = Headers}) -> Headers.
 method(#req{method = Method})    -> Method.
 body(#req{body = Body})          -> Body.
+id(#req{id = Id})                -> Id.
 
 peer(#req{socket = Socket} = Req) ->
     case get_header(<<"X-Forwarded-For">>, Req, undefined) of

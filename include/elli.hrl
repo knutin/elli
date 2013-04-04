@@ -36,7 +36,8 @@
           headers :: headers(),
           body :: body(),
           pid :: pid(),
-          socket :: inet:socket()
+          socket :: inet:socket(),
+          id :: reference()
 }).
 
 -define(EXAMPLE_CONF, [{callback, elli_example_callback},

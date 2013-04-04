@@ -122,16 +122,19 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
             {close_or_keepalive(Req, UserHeaders), B2}
     end.
 
--spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()}, RequestHeaders::headers(),
-             RequestBody::body(), V::version(), Socket::inet:socket() | undefined,
+-spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()},
+             RequestHeaders::headers(), RequestBody::body(),
+             V::version(), Socket::inet:socket() | undefined,
              Callback::callback()) -> record(req).
 mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
     {Mod, Args} = Callback,
     case parse_path(RawPath) of
         {ok, {Path, URL, URLArgs}} ->
+            <<Id:80/integer>> = <<(now_to_ms()):64/integer, (crypto:rand_bytes(2))/binary>>,
             #req{method = Method, path = URL, args = URLArgs, version = V,
                  raw_path = Path, headers = RequestHeaders,
-                 body = RequestBody, pid = self(), socket = Socket};
+                 body = RequestBody, pid = self(), socket = Socket,
+                 id = Id};
         {error, Reason} ->
             handle_event(Mod, request_parse_error,
                          [{Reason, {Method, RawPath}}], Args),
@@ -223,14 +226,27 @@ execute_callback(Req, {Mod, Args}) ->
             {response, ResponseCode, Headers, Body};
         throw:Exc ->
             handle_event(Mod, request_throw, [Req, Exc, erlang:get_stacktrace()], Args),
-            {response, 500, [], <<"Internal server error">>};
+            internal_error_response(Req);
         error:Error ->
             handle_event(Mod, request_error, [Req, Error, erlang:get_stacktrace()], Args),
-            {response, 500, [], <<"Internal server error">>};
+            internal_error_response(Req);
         exit:Exit ->
             handle_event(Mod, request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
-            {response, 500, [], <<"Internal server error">>}
+            internal_error_response(Req)
     end.
+
+internal_error_response(Req) ->
+    Body = <<"<html>"
+             "<head><title>Internal server error</title></head>"
+             "<body>"
+             "<h1>Internal server error</h1>"
+             "<p>Request id: #", (list_to_binary(
+                                    integer_to_list(
+                                      elli_request:id(Req))))/binary, "</p>"
+             "</body>"
+             "</html>">>,
+
+    {response, 500, [], Body}.
 
 handle_event(Mod, Name, EventArgs, ElliArgs) ->
     try
@@ -562,6 +578,12 @@ get_timings() ->
                      (_) ->
                           []
                  end, get()).
+
+now_to_ms() ->
+    now_to_ms(os:timestamp()).
+
+now_to_ms({MegaSecs,Secs,MicroSecs}) ->
+    (MegaSecs * 1000000 + Secs) * 1000 + MicroSecs div 1000.
 
 
 %%

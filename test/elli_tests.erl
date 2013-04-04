@@ -76,8 +76,11 @@ crash() ->
     {ok, Response} = httpc:request("http://localhost:3001/crash"),
     ?assertEqual(500, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
-                  {"content-length", "21"}], headers(Response)),
-    ?assertEqual("Internal server error", body(Response)).
+                  {"content-length", "142"}], headers(Response)),
+    ?assertNotEqual(nomatch, binary:match(list_to_binary(body(Response)),
+                                          <<"Internal server error">>)),
+    ?assertNotEqual(nomatch, binary:match(list_to_binary(body(Response)),
+                                          <<"Request id">>)).
 
 
 no_compress() ->
@@ -371,7 +374,8 @@ to_proplist_test() ->
                headers = [{<<"Host">>,<<"localhost:3001">>}],
                body = <<>>,
                pid = self(),
-               socket = socket},
+               socket = socket,
+               id = 123},
 
     Prop = [{method,'GET'},
             {path,[<<"crash">>]},
@@ -381,7 +385,8 @@ to_proplist_test() ->
             {headers,[{<<"Host">>,<<"localhost:3001">>}]},
             {body,<<>>},
             {pid,self()},
-            {socket,socket}],
+            {socket,socket},
+            {id, 123}],
     ?assertEqual(Prop, elli_request:to_proplist(Req)).
 
 
