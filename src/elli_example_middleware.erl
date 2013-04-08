@@ -15,12 +15,9 @@ handle(Req, _Args) ->
             ignore
     end.
 
-
-
 %%
 %% ELLI EVENT CALLBACKS
 %%
-
 
 handle_event(_Event, _Data, _Args) ->
     ok.

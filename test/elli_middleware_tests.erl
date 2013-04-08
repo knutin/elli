@@ -2,13 +2,16 @@
 -include_lib("eunit/include/eunit.hrl").
 -include("elli.hrl").
 
+-define(TRACE_TABLE, middleware_tests).
 
-elli_test_() ->
+
+elli_middleware_test_() ->
     {setup,
      fun setup/0, fun teardown/1,
      [
       ?_test(hello_world()),
       ?_test(short_circuit()),
+      ?_test(timings()),
       ?_test(compress())
      ]}.
 
@@ -26,6 +29,18 @@ hello_world() ->
     URL = "http://localhost:3002/hello/world",
     {ok, Response} = httpc:request(URL),
     ?assertEqual("Hello World!", body(Response)).
+
+timings() ->
+    elli_middleware_trace:clear(?TRACE_TABLE),
+
+    {ok, _} = httpc:request(get, {"http://localhost:3002/compressed",
+                                  [{"Accept-Encoding", "gzip"}]}, [], []),
+
+    [{_, request_complete, [_Request, _ResponseCode, _ResponseHeaders,
+                            _ResponseBody, Timings]}] = ets:tab2list(?TRACE_TABLE),
+    ?assert(proplists:is_defined(
+              {middleware_postprocess_end, elli_middleware_compress}, Timings)),
+    ok.
 
 
 compress() ->
@@ -88,6 +103,7 @@ setup() ->
                                          {port, 514}]},
                       {elli_example_middleware, []},
                       {elli_middleware_compress, []},
+                      {elli_middleware_trace, [{name, ?TRACE_TABLE}]},
                       {elli_example_callback, []}
                      ]}
              ],
@@ -99,6 +115,10 @@ setup() ->
     [P].
 
 teardown(Pids) ->
+    application:stop(crypto),
+    application:stop(public_key),
+    application:stop(ssl),
+    inets:stop(),
     [elli:stop(P) || P <- Pids].
 
 

@@ -64,8 +64,10 @@ process(Req, [{Mod, Args} | Mods]) ->
         true ->
             case Mod:handle(Req, Args) of
                 ignore ->
+                    elli_http:record_time({middleware_handle_end, Mod}),
                     process(Req, Mods);
                 Response ->
+                    elli_http:record_time({middleware_handle_end, Mod}),
                     Response
             end;
         false ->
@@ -77,7 +79,9 @@ preprocess(Req, []) ->
 preprocess(Req, [{Mod, Args} | Mods]) ->
     case erlang:function_exported(Mod, preprocess, 2) of
         true ->
-            preprocess(Mod:preprocess(Req, Args), Mods);
+            NewReq = Mod:preprocess(Req, Args),
+            elli_http:record_time({middleware_preprocess_end, Mod}),
+            preprocess(NewReq, Mods);
         false ->
             preprocess(Req, Mods)
     end.
@@ -87,7 +91,9 @@ postprocess(_Req, Res, []) ->
 postprocess(Req, Res, [{Mod, Args} | Mods]) ->
     case erlang:function_exported(Mod, postprocess, 3) of
         true ->
-            postprocess(Req, Mod:postprocess(Req, Res, Args), Mods);
+            NewRes = Mod:postprocess(Req, Res, Args),
+            elli_http:record_time({middleware_postprocess_end, Mod}),
+            postprocess(Req, NewRes, Mods);
         false ->
             postprocess(Req, Res, Mods)
     end.

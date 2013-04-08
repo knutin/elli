@@ -47,6 +47,10 @@ setup() ->
     [P].
 
 teardown(Pids) ->
+    application:stop(crypto),
+    application:stop(public_key),
+    application:stop(ssl),
+    inets:stop(),
     [elli:stop(P) || P <- Pids].
 
 

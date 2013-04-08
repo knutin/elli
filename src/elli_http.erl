@@ -11,6 +11,7 @@
 -export([start_link/4]).
 
 -export([mk_req/7]). %% useful when testing.
+-export([record_time/1]). %% For use in elli_middleware.erl
 
 %% Exported for looping with a fully-qualified module name
 -export([accept/4, handle_request/4, chunk_loop/1, split_args/1,
@@ -551,6 +552,9 @@ split_args(Qs) ->
 %% any variables.
 t(Key) ->
     put({time, Key}, os:timestamp()).
+
+record_time(Key) ->
+    t(Key).
 
 get_timings() ->
     lists:flatmap(fun ({{time, Key}, Val}) ->
