@@ -10,13 +10,13 @@
 -include("../include/elli.hrl").
 
 %% API
--export([start_link/0
-         , start_link/1
-         , stop/1
-         , get_acceptors/1
-         , get_open_reqs/1
-         , get_open_reqs/2
-         , set_callback/3
+-export([start_link/0,
+         start_link/1,
+         stop/1,
+         get_acceptors/1,
+         get_open_reqs/1,
+         get_open_reqs/2,
+         set_callback/3
         ]).
 
 %% gen_server callbacks
@@ -40,9 +40,8 @@
 start_link() -> start_link(?EXAMPLE_CONF).
 
 start_link(Opts) ->
-    %% Validate options
-    Callback = required_opt(callback, Opts),
-    valid_callback(Callback) orelse throw(invalid_callback),
+    valid_callback(required_opt(callback, Opts))
+        orelse throw(invalid_callback),
 
     case proplists:get_value(name, Opts) of
         undefined ->
@@ -83,6 +82,15 @@ init([Opts]) ->
     Port           = proplists:get_value(port, Opts, 8080),
     MinAcceptors   = proplists:get_value(min_acceptors, Opts, 20),
 
+    UseSSL         = proplists:get_value(ssl, Opts, false),
+    KeyFile        = proplists:get_value(keyfile, Opts),
+    CertFile       = proplists:get_value(certfile, Opts),
+    SockType       = case UseSSL of true -> ssl; false -> plain end,
+    SSLSockOpts    = case UseSSL of
+                         true -> [{keyfile, KeyFile},
+                                  {certfile, CertFile}];
+                         false -> [] end,
+
     AcceptTimeout  = proplists:get_value(accept_timeout, Opts, 10000),
     RequestTimeout = proplists:get_value(request_timeout, Opts, 60000),
     HeaderTimeout  = proplists:get_value(header_timeout, Opts, 10000),
@@ -100,13 +108,14 @@ init([Opts]) ->
     %% tables, etc.
     ok = Callback:handle_event(elli_startup, [], CallbackArgs),
 
-    {ok, Socket} = gen_tcp:listen(Port, [binary,
-                                         {ip, IPAddress},
-                                         {reuseaddr, true},
-                                         {backlog, 32768},
-                                         {packet, raw},
-                                         {active, false}
-                                        ]),
+    {ok, Socket} = elli_tcp:listen(SockType, Port, [binary,
+                                                    {ip, IPAddress},
+                                                    {reuseaddr, true},
+                                                    {backlog, 32768},
+                                                    {packet, raw},
+                                                    {active, false}
+                                                    | SSLSockOpts
+                                                   ]),
     Acceptors = [elli_http:start_link(self(), Socket, Options,
                                       {Callback, CallbackArgs})
                  || _ <- lists:seq(1, MinAcceptors)],
@@ -179,7 +188,6 @@ required_opt(Name, Opts) ->
         Value ->
             Value
     end.
-
 
 valid_callback(Mod) ->
     lists:member({handle, 2}, Mod:module_info(exports)) andalso
