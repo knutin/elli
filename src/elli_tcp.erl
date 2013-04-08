@@ -1,0 +1,74 @@
+%% @doc: Wrapper for plain and SSL sockets. Based on
+%% mochiweb_socket.erl
+
+-module(elli_tcp).
+-export([listen/3, accept/2, recv/3, send/2, close/1, setopts/2, sendfile/5]).
+
+listen(plain, Port, Opts) ->
+    case gen_tcp:listen(Port, Opts) of
+        {ok, Socket} ->
+            {ok, {plain, Socket}};
+        {error, Reason} ->
+            {error, Reason}
+    end;
+
+listen(ssl, Port, Opts) ->
+    case ssl:listen(Port, Opts) of
+        {ok, Socket} ->
+            {ok, {ssl, Socket}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+
+
+accept({plain, Socket}, Timeout) ->
+    case gen_tcp:accept(Socket, Timeout) of
+        {ok, S} ->
+            {ok, {plain, S}};
+        {error, Reason} ->
+            {error, Reason}
+    end;
+accept({ssl, Socket}, Timeout) ->
+    case ssl:transport_accept(Socket, Timeout) of
+        {ok, S} ->
+            case ssl:ssl_accept(S, Timeout) of
+                ok ->
+                    {ok, {ssl, S}};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+
+recv({plain, Socket}, Size, Timeout) ->
+    gen_tcp:recv(Socket, Size, Timeout);
+recv({ssl, Socket}, Size, Timeout) ->
+    ssl:recv(Socket, Size, Timeout).
+
+send({plain, Socket}, Data) ->
+    gen_tcp:send(Socket, Data);
+send({ssl, Socket}, Data) ->
+    ssl:send(Socket, Data).
+
+close({plain, Socket}) ->
+    gen_tcp:close(Socket);
+close({ssl, Socket}) ->
+    ssl:close(Socket).
+
+setopts({plain, Socket}, Opts) ->
+    inet:setopts(Socket, Opts);
+setopts({ssl, Socket}, Opts) ->
+    ssl:setopts(Socket, Opts).
+
+
+
+sendfile(Fd, {plain, Socket}, Offset, Length, Opts) ->
+    file:sendfile(Fd, Socket, Offset, Length, []);
+sendfile(_Fd, {ssl, Socket}, _Offset, _Length, _Opts) ->
+    throw(ssl_sendfile_not_supported).
+
+
+

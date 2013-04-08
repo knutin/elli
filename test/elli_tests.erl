@@ -56,8 +56,7 @@ teardown(Pids) ->
 %%
 
 hello_world() ->
-    URL = "http://localhost:3001/hello/world",
-    {ok, Response} = httpc:request(URL),
+    {ok, Response} = httpc:request("http://localhost:3001/hello/world"),
     ?assertEqual(200, status(Response)),
     ?assertEqual([{"connection", "Keep-Alive"},
                   {"content-length", "12"}], headers(Response)),
