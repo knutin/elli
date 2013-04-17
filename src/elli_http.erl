@@ -71,8 +71,8 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
 
     Req = mk_req(Method, RawPath, RequestHeaders, <<>>, V, S, Callback),
 
-    case behaviour(Req) of
-        pure ->
+    case init(Req) of
+        {ok, standard} ->
             {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback), t(body_end),
             Req1 = Req#req{body = RequestBody},
 
@@ -81,7 +81,7 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
             t(user_end),
 
             handle_response(Req1, B2, Response);
-        handover ->
+        {ok, handover} ->
             Req1 = Req#req{body = B1},
             Mod:handle(Req1, Args)
     end.
@@ -556,12 +556,17 @@ split_args(Qs) ->
 %% CALLBACK HELPERS
 %%
 
-behaviour(#req{callback = {Mod, Args}} = Req) ->
+init(#req{callback = {Mod, Args}} = Req) ->
     case erlang:function_exported(Mod, init, 2) of
         true ->
-            Mod:init(Req, Args);
+            case Mod:init(Req, Args) of
+                ignore ->
+                    {ok, standard};
+                {ok, Behaviour} ->
+                    {ok, Behaviour}
+            end;
         false ->
-            pure
+            {ok, standard}
     end.
 
 handle_event(Mod, Name, EventArgs, ElliArgs) ->
