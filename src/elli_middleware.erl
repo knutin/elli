@@ -30,11 +30,15 @@
 
 -module(elli_middleware).
 -behaviour(elli_handler).
--export([handle/2, handle_event/3]).
+-export([init/2, handle/2, handle_event/3]).
 
 %%
 %% ELLI CALLBACKS
 %%
+
+init(Req, Args) ->
+    do_init(Req, mods(Args)).
+
 
 handle(CleanReq, Config) ->
     Mods   = mods(Config),
@@ -56,6 +60,22 @@ handle_event(Event, Args, Config) ->
 %%
 %% MIDDLEWARE LOGIC
 %%
+
+do_init(_, []) ->
+    {ok, standard};
+do_init(Req, [{Mod, Args} | Mods]) ->
+    case erlang:function_exported(Mod, init, 2) of
+        true ->
+            case Mod:init(Req, Args) of
+                ignore ->
+                    do_init(Req, Mods);
+                Result ->
+                    Result
+            end;
+        false ->
+            do_init(Req, Mods)
+    end.
+
 
 process(_Req, []) ->
     {404, [], <<"Not Found">>};

@@ -4,9 +4,9 @@
 init(Req, Args) ->
     case elli_request:path(Req) of
         [<<"hello">>, <<"world">>] ->
-            handover;
+            {ok, handover};
         _ ->
-            pure
+            ignore
     end.
 
 handle(Req, Args) ->
