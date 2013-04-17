@@ -371,7 +371,8 @@ to_proplist_test() ->
                headers = [{<<"Host">>,<<"localhost:3001">>}],
                body = <<>>,
                pid = self(),
-               socket = socket},
+               socket = socket,
+               callback = {mod, []}},
 
     Prop = [{method,'GET'},
             {path,[<<"crash">>]},
@@ -381,7 +382,8 @@ to_proplist_test() ->
             {headers,[{<<"Host">>,<<"localhost:3001">>}]},
             {body,<<>>},
             {pid,self()},
-            {socket,socket}],
+            {socket,socket},
+            {callback, {mod, []}}],
     ?assertEqual(Prop, elli_request:to_proplist(Req)).
 
 

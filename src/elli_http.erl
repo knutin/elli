@@ -10,6 +10,8 @@
 %% API
 -export([start_link/4]).
 
+-export([send_response/4]).
+
 -export([mk_req/7]). %% useful when testing.
 
 %% Exported for looping with a fully-qualified module name
@@ -24,8 +26,8 @@ start_link(Server, ListenSocket, Options, Callback) ->
 -spec accept(pid(), port(), proplists:proplist(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
 %% request, then loops if we're using keep alive or chunked
-%% transfer. If accept doesn't give us a socket within 10 seconds, we
-%% loop to allow code upgrades.
+%% transfer. If accept doesn't give us a socket within a configurable
+%% timeout, we loop to allow code upgrades of this module.
 accept(Server, ListenSocket, Options, Callback) ->
     case catch gen_tcp:accept(ListenSocket, accept_timeout(Options)) of
         {ok, Socket} ->
@@ -64,74 +66,86 @@ keepalive_loop(Socket, NumRequests, Buffer, Options, Callback) ->
 %% containing (parts of) the next request.
 handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
     {Method, RawPath, V, B0} = get_request(S, PrevB, Opts, Callback), t(request_start),
-    {RequestHeaders, B1} = get_headers(S, V, B0, Opts, Callback),       t(headers_end),
-    {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback),   t(body_end),
+    {RequestHeaders, B1} = get_headers(S, V, B0, Opts, Callback),     t(headers_end),
 
-    Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, S, Callback),
+    Req = mk_req(Method, RawPath, RequestHeaders, <<>>, V, S, Callback),
 
-    t(user_start),
-    case execute_callback(Req, Callback) of
-        {response, ResponseCode, UserHeaders, UserBody} ->
+    case behaviour(Req) of
+        pure ->
+            {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback), t(body_end),
+            Req1 = Req#req{body = RequestBody},
+
+            t(user_start),
+            Response = execute_callback(Req1),
             t(user_end),
 
-            ResponseHeaders = [connection(Req, UserHeaders),
-                               content_length(UserHeaders, UserBody)
-                               | UserHeaders],
-            send_response(S, Method, ResponseCode,
-                          ResponseHeaders, UserBody, Callback),
-
-            t(request_end),
-            handle_event(Mod, request_complete,
-                         [Req, ResponseCode, ResponseHeaders, UserBody, get_timings()],
-                         Args),
-
-            {close_or_keepalive(Req, UserHeaders), B2};
-
-        {chunk, UserHeaders, Initial} ->
-            t(user_end),
-
-            ResponseHeaders = [{<<"Transfer-Encoding">>, <<"chunked">>},
-                               connection(Req, UserHeaders)
-                               | UserHeaders],
-            send_response(S, Method, 200, ResponseHeaders, <<"">>, Callback),
-            Initial =:= <<"">> orelse send_chunk(S, Initial),
-
-            ClosingEnd = case start_chunk_loop(S) of
-                             {error, client_closed} -> client;
-                             ok -> server
-                         end,
-
-            t(request_end),
-            handle_event(Mod, chunk_complete,
-                         [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
-                         Args),
-            {close, <<>>};
-
-        {file, ResponseCode, UserHeaders, Filename, Range} ->
-            t(user_end),
-
-            ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
-            send_file(S, ResponseCode, ResponseHeaders, Filename, Range, Callback),
-
-            t(request_end),
-
-            handle_event(Mod, request_complete,
-                         [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
-                         Args),
-
-            {close_or_keepalive(Req, UserHeaders), B2}
+            handle_response(Req1, B2, Response);
+        handover ->
+            Req1 = Req#req{body = B1},
+            Mod:handle(Req1, Args)
     end.
 
--spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()}, RequestHeaders::headers(),
-             RequestBody::body(), V::version(), Socket::inet:socket() | undefined,
-             Callback::callback()) -> record(req).
+handle_response(Req, Buffer, {response, Code, UserHeaders, Body}) ->
+    #req{callback = {Mod, Args}} = Req,
+
+    Headers = [connection(Req, UserHeaders),
+               content_length(UserHeaders, Body)
+               | UserHeaders],
+    send_response(Req, Code, Headers, Body),
+
+    t(request_end),
+    handle_event(Mod, request_complete, [Req, Code, Headers, Body, get_timings()], Args),
+
+    {close_or_keepalive(Req, UserHeaders), Buffer};    
+
+
+handle_response(Req, _Buffer, {chunk, UserHeaders, Initial}) ->
+    #req{callback = {Mod, Args}} = Req,
+
+    ResponseHeaders = [{<<"Transfer-Encoding">>, <<"chunked">>},
+                       connection(Req, UserHeaders)
+                       | UserHeaders],
+    send_response(Req, 200, ResponseHeaders, <<"">>),
+    Initial =:= <<"">> orelse send_chunk(Req#req.socket, Initial),
+
+    ClosingEnd = case start_chunk_loop(Req#req.socket) of
+                     {error, client_closed} -> client;
+                     ok -> server
+                 end,
+
+    t(request_end),
+    handle_event(Mod, chunk_complete,
+                 [Req, 200, ResponseHeaders, ClosingEnd, get_timings()],
+                 Args),
+    {close, <<>>};
+
+handle_response(Req, Buffer, {file, ResponseCode, UserHeaders, Filename, Range}) ->
+    #req{callback = {Mod, Args}} = Req,
+
+    ResponseHeaders = [connection(Req, UserHeaders) | UserHeaders],
+    send_file(Req, ResponseCode, ResponseHeaders, Filename, Range),
+
+    t(request_end),
+    handle_event(Mod, request_complete,
+                 [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
+                 Args),
+
+    {close_or_keepalive(Req, UserHeaders), Buffer}.
+
+
+
+-spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()},
+             RequestHeaders::headers(), RequestBody::body(), V::version(),
+             Socket::inet:socket() | undefined, Callback::callback()) ->
+                    record(req).
 mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
     {Mod, Args} = Callback,
     case parse_path(RawPath) of
         {ok, {Path, URL, URLArgs}} ->
             #req{method = Method, path = URL, args = URLArgs, version = V,
                  raw_path = Path, headers = RequestHeaders,
-                 body = RequestBody, pid = self(), socket = Socket};
+                 body = RequestBody, pid = self(), socket = Socket,
+                 callback = Callback};
         {error, Reason} ->
             handle_event(Mod, request_parse_error,
                          [{Reason, {Method, RawPath}}], Args),
@@ -142,8 +156,8 @@ mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
 
 
 %% @doc: Generates a HTTP response and sends it to the client
-send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
-    Body = case {Method, Code} of
+send_response(Req, Code, Headers, UserBody) ->
+    Body = case {Req#req.method, Code} of
                {'HEAD', _} -> <<>>;
                {_, 304}    -> <<>>;
                {_, 204}    -> <<>>;
@@ -154,29 +168,31 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
                 encode_headers(Headers), <<"\r\n">>,
                 Body],
 
-    case gen_tcp:send(Socket, Response) of
+    case gen_tcp:send(Req#req.socket, Response) of
         ok -> ok;
         {error, closed} ->
+            #req{callback = {Mod, Args}} = Req,
             handle_event(Mod, client_closed, [before_response], Args),
             ok
     end.
 
 
--spec send_file(Socket::inet:socket(), Code::response_code(), Headers::headers(),
-                Filename::file:filename(), Range::range(),
-                Callback::callback()) -> ok.
+-spec send_file(Request::#req{}, Code::response_code(), Headers::headers(),
+                Filename::file:filename(), Range::range()) -> ok.
+
 %% @doc: Sends a HTTP response to the client where the body is the
 %% contents of the given file.  Assumes correctly set response code
 %% and headers.
-send_file(Socket, Code, Headers, Filename, {Offset, Length}, {Mod, Args}) ->
+send_file(Req, Code, Headers, Filename, {Offset, Length}) ->
+    #req{callback = {Mod, Args}} = Req,
     ResponseHeaders = [<<"HTTP/1.1 ">>, status(Code), <<"\r\n">>,
                        encode_headers(Headers), <<"\r\n">>],
 
     case file:open(Filename, [read, raw, binary]) of
         {ok, Fd} ->
-            try gen_tcp:send(Socket, ResponseHeaders) of
+            try gen_tcp:send(Req#req.socket, ResponseHeaders) of
                 ok ->
-                    case file:sendfile(Fd, Socket, Offset, Length, []) of
+                    case file:sendfile(Fd, Req#req.socket, Offset, Length, []) of
                         {ok, _BytesSent} ->
                             ok;
                         {error, closed} ->
@@ -204,7 +220,7 @@ send_bad_request(Socket) ->
 
 %% @doc: Executes the user callback, translating failure into a proper
 %% response.
-execute_callback(Req, {Mod, Args}) ->
+execute_callback(#req{callback = {Mod, Args}} = Req) ->
     try Mod:handle(Req, Args) of
         {ok, Headers, {file, Filename}}       -> {file, 200, Headers, Filename, {0, 0}};
         {ok, Headers, {file, Filename, Range}}-> {file, 200, Headers, Filename, Range};
@@ -230,16 +246,6 @@ execute_callback(Req, {Mod, Args}) ->
         exit:Exit ->
             handle_event(Mod, request_exit, [Req, Exit, erlang:get_stacktrace()], Args),
             {response, 500, [], <<"Internal server error">>}
-    end.
-
-handle_event(Mod, Name, EventArgs, ElliArgs) ->
-    try
-        Mod:handle_event(Name, EventArgs, ElliArgs)
-    catch
-        EvClass:EvError ->
-            error_logger:error_msg("~p:handle_event/3 crashed ~p:~p~n~p",
-                                   [Mod, EvClass, EvError,
-                                    erlang:get_stacktrace()])
     end.
 
 %%
@@ -541,6 +547,28 @@ split_args(Qs) ->
 		[Name, Value] -> {Name, Value}
 	end || Token <- Tokens].
 
+
+%%
+%% CALLBACK HELPERS
+%%
+
+behaviour(#req{callback = {Mod, Args}} = Req) ->
+    case erlang:function_exported(Mod, init, 2) of
+        true ->
+            Mod:init(Req, Args);
+        false ->
+            pure
+    end.
+
+handle_event(Mod, Name, EventArgs, ElliArgs) ->
+    try
+        Mod:handle_event(Name, EventArgs, ElliArgs)
+    catch
+        EvClass:EvError ->
+            error_logger:error_msg("~p:handle_event/3 crashed ~p:~p~n~p",
+                                   [Mod, EvClass, EvError,
+                                    erlang:get_stacktrace()])
+    end.
 
 %%
 %% TIMING HELPERS
