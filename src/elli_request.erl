@@ -1,5 +1,6 @@
 -module(elli_request).
 -include("../include/elli.hrl").
+-include("elli_util.hrl").
 
 -export([send_chunk/2
          , async_send_chunk/2
