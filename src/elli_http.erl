@@ -354,6 +354,8 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
             get_headers(Socket, Rest, NewHeaders, HeadersCount + 1, Opts, Callback);
         {ok, http_eoh, Rest} ->
             {Headers, Rest};
+        {ok, {http_error, _}, Rest} ->
+            get_headers(Socket, Rest, Headers, HeadersCount, Opts, Callback);
         {more, _} ->
             case gen_tcp:recv(Socket, 0, header_timeout(Opts)) of
                 {ok, Data} ->
