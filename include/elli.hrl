@@ -22,6 +22,12 @@
 -type range() :: {Offset::non_neg_integer(), Length::non_neg_integer()}.
 
 -type timestamp() :: {integer(), integer(), integer()}.
+-type elli_event() :: elli_startup |
+                      bad_request | file_error |
+                      chunk_complete | request_complete |
+                      request_throw | request_error | request_exit |
+                      request_closed | request_parse_error |
+                      client_closed | client_timeout.
 
 -record(req, {
           method :: http_method(),
