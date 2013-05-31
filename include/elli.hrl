@@ -28,6 +28,7 @@
                       request_throw | request_error | request_exit |
                       request_closed | request_parse_error |
                       client_closed | client_timeout.
+-type cfg() :: list() | [].
 
 -record(req, {
           method :: http_method(),
@@ -40,6 +41,18 @@
           pid :: pid(),
           socket :: inet:socket()
 }).
+-type req() :: #req{}.
+
+-type chunk_ref() :: pid() | {error, not_supported}.
+-type handler_ret() :: ignore | {response_code(), headers(), body()} 
+                       | {ok, headers(), body()} 
+                       | {chunk, headers()}.
+
+-export_type([callback_mod/0, callback_args/0, callback/0, path/0,
+  args/0, version/0, header/0, headers/0, body/0, response/0,
+  http_method/0, response_code/0, connection_token_atom/0,
+  http_range/0, range/0, timestamp/0, elli_event/0, req/0,
+  chunk_ref/0, handler_ret/0]).
 
 -define(EXAMPLE_CONF, [{callback, elli_example_callback},
                        {callback_args, []}]).

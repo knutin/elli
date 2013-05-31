@@ -1,3 +1,4 @@
+%%% Defines elli_handler behaviour.
 -module(elli_handler).
 -include("elli.hrl").
 
