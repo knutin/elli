@@ -16,6 +16,7 @@
          , get_acceptors/1
          , get_open_reqs/1
          , get_open_reqs/2
+         , set_callback/3
         ]).
 
 %% gen_server callbacks
@@ -55,6 +56,10 @@ get_open_reqs(S) ->
 
 get_open_reqs(S, Timeout) ->
     gen_server:call(S, get_open_reqs, Timeout).
+
+set_callback(S, Callback, CallbackArgs) ->
+    valid_callback(Callback) orelse throw(invalid_callback),
+    gen_server:call(S, {set_callback, Callback, CallbackArgs}).
 
 stop(S) ->
     gen_server:call(S, stop).
@@ -115,6 +120,10 @@ handle_call(get_acceptors, _From, State) ->
 
 handle_call(get_open_reqs, _From, State) ->
     {reply, {ok, State#state.open_reqs}, State};
+
+handle_call({set_callback, Callback, CallbackArgs}, _From, State) ->
+    ok = Callback:handle_event(elli_reconfigure, [], CallbackArgs),
+    {reply, ok, State#state{callback = {Callback, CallbackArgs}}};
 
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
