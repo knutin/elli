@@ -1,4 +1,4 @@
--module(elli_example_middleware).
+-module(elli_example_filter).
 -export([handle/2, handle_event/3]).
 -behaviour(elli_handler).
 

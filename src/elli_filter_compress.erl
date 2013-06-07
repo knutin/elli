@@ -2,7 +2,7 @@
 %% requests and compresses bodies larger than compress_byte_size (1024
 %% by default).
 
--module(elli_middleware_compress).
+-module(elli_filter_compress).
 -export([postprocess/3]).
 
 %%

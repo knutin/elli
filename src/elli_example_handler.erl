@@ -1,12 +1,12 @@
-%% @doc: Elli example callback
+%% @doc: Elli example handler
 %%
-%% Your callback needs to implement two functions, handle/2 and
+%% Your handler needs to implement two functions, handle/2 and
 %% handle_event/3. For every request, Elli will call your handle
 %% function with the request. When an event happens, like Elli
 %% completed a request, there was a parsing error or your handler
 %% threw an error, handle_event/3 is called.
 
--module(elli_example_callback).
+-module(elli_example_handler).
 -export([handle/2, handle_event/3]).
 -export([chunk_loop/1]).
 
