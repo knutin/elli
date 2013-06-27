@@ -23,10 +23,13 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--record(state, {socket,
-                acceptors,
-                open_reqs,
-                options,
+-type req() :: record(req).
+-export_type([req/0, body/0]).
+
+-record(state, {socket :: port(),
+                acceptors :: [pid()],
+                open_reqs :: non_neg_integer(),
+                options :: [{_, _}],
                 callback :: callback()
 }).
 
