@@ -20,7 +20,7 @@
 
 -spec start_link(pid(), port(), proplists:proplist(), callback()) -> pid().
 start_link(Server, ListenSocket, Options, Callback) ->
-    spawn_link(?MODULE, accept, [Server, ListenSocket, Options, Callback]).
+    proc_lib:spawn_link(?MODULE, accept, [Server, ListenSocket, Options, Callback]).
 
 -spec accept(pid(), port(), proplists:proplist(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
