@@ -229,6 +229,10 @@ handle_event(chunk_complete, [_Request,
 %% Elli is waiting for the next request on a keep alive connection.
 handle_event(request_closed, [], _) -> ok;
 
+%% request_timeout is sent if the client times out when
+%% Elli is waiting for the request.
+handle_event(request_timeout, [], _) -> ok;
+
 %% request_parse_error fires if the request is invalid and cannot be
 %% parsed by erlang:decode_packet/3 or it contains a path Elli cannot
 %% parse or does not support.
