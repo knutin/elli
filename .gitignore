@@ -4,3 +4,4 @@ ebin/**
 .eunit
 *~
 #*
+.dialyzer.plt

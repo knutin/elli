@@ -11,7 +11,9 @@
 -type body() :: binary() | iolist().
 -type response() :: iolist().
 -type http_method() :: 'OPTIONS' | 'GET' | 'HEAD' | 'POST' |
-                       'PUT' | 'DELETE' | 'TRACE'.
+                       'PUT' | 'DELETE' | 'TRACE' | binary().
+                       %% binary for other http methods
+
 -type response_code() :: 100..999.
 -type connection_token_atom() :: keep_alive | close.
 
