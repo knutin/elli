@@ -331,6 +331,9 @@ get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
             handle_event(Mod, request_parse_error, [Buffer], Args),
             send_bad_request(Socket),
             gen_tcp:close(Socket),
+            exit(normal);
+        {ok, {http_response, _, _, _}, _} ->
+            gen_tcp:close(Socket),
             exit(normal)
     end.
 
