@@ -52,6 +52,9 @@ upgrade_when_not_allowed() ->
     ?assertEqual({error, socket_closed_remotely}, Response).
 
 upgrade_allowed() ->
-    Response = httpc:request(get, {"http://localhost:3001/websocket",
+    {ok, Response} = httpc:request(get, {"http://localhost:3001/websocket",
         [{"Upgrade", "websocket"}]}, [], []),
-    ?assertEqual({error, socket_closed_remotely}, Response).
+    ?assertEqual(200, status(Response)).
+
+status({{_, Status, _}, _, _}) ->
+    Status.
