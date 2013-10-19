@@ -163,6 +163,18 @@ handle('GET', [<<"403">>], _Req) ->
     %% authentication/authorization
     throw({403, [], <<"Forbidden">>});
 
+handle('GET', [<<"websocket">>], _Req) ->
+    Callback = fun(_ReqHeaders, _ReqBody, Socket) -> 
+        %% this exists to demonstrate how an upgrade handle
+        %% is really just a way to cede control of the socket
+        %% to the handler.
+        Response = [<<"HTTP/1.1 ">>, <<"200 OK">>, <<"\r\n">>,
+                                    <<"Content-Length: 0">>, <<"\r\n\r\n">>],
+        gen_tcp:send(Socket, Response),
+        gen_tcp:close(Socket)
+    end,
+    {upgrade, Callback};
+
 handle(_, _, _Req) ->
     {404, [], <<"Not Found">>}.
 

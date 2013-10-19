@@ -55,7 +55,8 @@ keepalive_loop(Socket, NumRequests, Buffer, Options, Callback) ->
             ?MODULE:keepalive_loop(Socket, NumRequests, NewBuffer, Options, Callback);
         {close, _} ->
             gen_tcp:close(Socket),
-            ok
+            ok;
+        upgrade -> ok
     end.
 
 -spec handle_request(port(), binary(), proplists:proplist(), callback()) ->
@@ -67,6 +68,7 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
     {Method, RawPath, V, B0} = get_request(S, PrevB, Opts, Callback), t(request_start),
     {RequestHeaders, B1} = get_headers(S, V, B0, Opts, Callback),       t(headers_end),
     {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback),   t(body_end),
+    AllowUpgrade = proplists:get_bool(upgrade, Opts),
 
     Req = mk_req(Method, RawPath, RequestHeaders, RequestBody, V, S, Callback),
 
@@ -120,7 +122,15 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
                          [Req, ResponseCode, ResponseHeaders, <<>>, get_timings()],
                          Args),
 
-            {close_or_keepalive(Req, UserHeaders), B2}
+            {close_or_keepalive(Req, UserHeaders), B2};
+        {upgrade, UpgradeCallback} ->
+            case AllowUpgrade of
+                true -> 
+                    UpgradeCallback(RequestHeaders, RequestBody, S),
+                    upgrade;
+                _ -> 
+                    {close, <<>>}
+            end
     end.
 
 -spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()}, RequestHeaders::headers(),
@@ -213,6 +223,7 @@ execute_callback(Req, {Mod, Args}) ->
         {ok, Body}                            -> {response, 200, [], Body};
         {chunk, Headers}                      -> {chunk, Headers, <<"">>};
         {chunk, Headers, Initial}             -> {chunk, Headers, Initial};
+        {upgrade, Callback}                   -> {upgrade, Callback};
         {HttpCode, Headers, {file, Filename}} ->
             {file, HttpCode, Headers, Filename, {0, 0}};
         {HttpCode, Headers, {file, Filename, Range}} ->
