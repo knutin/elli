@@ -385,6 +385,10 @@ to_proplist_test() ->
             {socket,socket}],
     ?assertEqual(Prop, elli_request:to_proplist(Req)).
 
+is_request_test() ->
+    ?assert(elli_request:is_request(#req{})),
+    ?assertNot(elli_request:is_request({req, foobar})).
+
 
 query_str_test_() ->
     MakeReq = fun(Path) -> #req{raw_path = Path} end,

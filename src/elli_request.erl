@@ -23,6 +23,7 @@
          , get_range/1
          , get_header/3
          , to_proplist/1
+         , is_request/1
         ]).
 
 %%
@@ -198,3 +199,6 @@ is_ref_alive(Ref) ->
         true -> is_process_alive(Ref);
         false -> rpc:call(node(Ref), erlang, is_process_alive, [Ref])
     end.
+
+is_request(#req{}) -> true;
+is_request(_)      -> false.
