@@ -89,7 +89,7 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
             t(user_end),
 
             t(request_end),
-            handle_event(Mod, request_complete, [Req1, handover, get_timings()], Args),
+            handle_event(Mod, request_complete, [Req1, handover, [], <<>>, get_timings()], Args),
             Response
     end.
 
