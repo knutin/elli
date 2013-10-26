@@ -83,7 +83,14 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
             handle_response(Req1, B2, Response);
         {ok, handover} ->
             Req1 = Req#req{body = B1},
-            Mod:handle(Req1, Args)
+
+            t(user_start),
+            Response = Mod:handle(Req1, Args),
+            t(user_end),
+
+            t(request_end),
+            handle_event(Mod, request_complete, [Req1, handover, get_timings()], Args),
+            Response
     end.
 
 handle_response(Req, Buffer, {response, Code, UserHeaders, Body}) ->
