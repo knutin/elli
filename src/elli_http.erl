@@ -178,7 +178,7 @@ send_response(Req, Code, Headers, UserBody) ->
 
     case elli_tcp:send(Req#req.socket, Response) of
         ok -> ok;
-        {error, closed} ->
+        {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
             #req{callback = {Mod, Args}} = Req,
             handle_event(Mod, client_closed, [before_response], Args),
             ok
@@ -203,10 +203,10 @@ send_file(Req, Code, Headers, Filename, {Offset, Length}) ->
                     case elli_tcp:sendfile(Fd, Req#req.socket, Offset, Length, []) of
                         {ok, _BytesSent} ->
                             ok;
-                        {error, closed} ->
+                        {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                             handle_event(Mod, client_closed, [before_response], Args)
                     end;
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     handle_event(Mod, client_closed, [before_response], Args)
             after
                 file:close(Fd)
@@ -281,7 +281,7 @@ chunk_loop(Socket) ->
                 ok ->
                     elli_tcp:close(Socket),
                     ok;
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     {error, client_closed}
             end;
         {chunk, <<>>, From} ->
@@ -290,7 +290,7 @@ chunk_loop(Socket) ->
                     elli_tcp:close(Socket),
                     From ! {self(), ok},
                     ok;
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     From ! {self(), {error, closed}},
                     ok
             end;
@@ -302,7 +302,7 @@ chunk_loop(Socket) ->
             case send_chunk(Socket, Data) of
                 ok ->
                     From ! {self(), ok};
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     From ! {self(), {error, closed}}
             end,
             ?MODULE:chunk_loop(Socket)
@@ -333,7 +333,7 @@ get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
                     handle_event(Mod, request_timeout, [], Args),
                     elli_tcp:close(Socket),
                     exit(normal);
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     handle_event(Mod, request_closed, [], Args),
                     elli_tcp:close(Socket),
                     exit(normal)
@@ -377,7 +377,7 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
                 {ok, Data} ->
                     get_headers(Socket, <<Buffer/binary, Data/binary>>,
                                 Headers, HeadersCount, Opts, Callback);
-                {error, closed} ->
+                {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     handle_event(Mod, client_closed, [receiving_headers], Args),
                     elli_tcp:close(Socket),
                     exit(normal);
@@ -417,7 +417,7 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
                     case elli_tcp:recv(Socket, N, body_timeout(Opts)) of
                         {ok, Data} ->
                             {<<Buffer/binary, Data/binary>>, <<>>};
-                        {error, closed} ->
+                        {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                             handle_event(Mod, client_closed, [receiving_body], Args),
                             ok = elli_tcp:close(Socket),
                             exit(normal);
