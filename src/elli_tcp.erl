@@ -66,9 +66,7 @@ setopts({ssl, Socket}, Opts) ->
 
 
 sendfile(Fd, {plain, Socket}, Offset, Length, Opts) ->
-    file:sendfile(Fd, Socket, Offset, Length, []);
-sendfile(_Fd, {ssl, Socket}, _Offset, _Length, _Opts) ->
+    file:sendfile(Fd, Socket, Offset, Length, Opts);
+sendfile(_Fd, {ssl, _}, _Offset, _Length, _Opts) ->
     throw(ssl_sendfile_not_supported).
-
-
 
