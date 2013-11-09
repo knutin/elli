@@ -20,11 +20,11 @@
          parse_path/1, keepalive_loop/3, keepalive_loop/5]).
 
 
--spec start_link(pid(), port(), proplists:proplist(), callback()) -> pid().
+-spec start_link(pid(), elli_tcp:socket(), proplists:proplist(), callback()) -> pid().
 start_link(Server, ListenSocket, Options, Callback) ->
     proc_lib:spawn_link(?MODULE, accept, [Server, ListenSocket, Options, Callback]).
 
--spec accept(pid(), port(), proplists:proplist(), callback()) -> ok.
+-spec accept(pid(), elli_tcp:socket(), proplists:proplist(), callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
 %% request, then loops if we're using keep alive or chunked
 %% transfer. If accept doesn't give us a socket within a configurable
@@ -60,7 +60,7 @@ keepalive_loop(Socket, NumRequests, Buffer, Options, Callback) ->
             ok
     end.
 
--spec handle_request(port(), binary(), proplists:proplist(), callback()) ->
+-spec handle_request(elli_tcp:socket(), binary(), proplists:proplist(), callback()) ->
                             {'keep_alive' | 'close', binary()}.
 %% @doc: Handle a HTTP request that will possibly come on the
 %% socket. Returns the appropriate connection token and any buffer
@@ -144,7 +144,7 @@ handle_response(Req, Buffer, {file, ResponseCode, UserHeaders, Filename, Range})
 
 -spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()},
              RequestHeaders::headers(), RequestBody::body(), V::version(),
-             Socket::inet:socket() | undefined, Callback::callback()) ->
+             Socket::elli_tcp:socket() | undefined, Callback::callback()) ->
                     record(req).
 mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
     {Mod, Args} = Callback,
@@ -350,7 +350,7 @@ get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
             exit(normal)
     end.
 
--spec get_headers(port(), version(), binary(), proplists:proplist(), callback()) ->
+-spec get_headers(elli_tcp:socket(), version(), binary(), proplists:proplist(), callback()) ->
                          {headers(), any()}.
 get_headers(_Socket, {0, 9}, _, _, _) ->
     {[], <<>>};
@@ -388,7 +388,7 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
             end
     end.
 
--spec get_body(port(), headers(), binary(),
+-spec get_body(elli_tcp:socket(), headers(), binary(),
                proplists:proplist(), callback()) -> {body(), binary()}.
 %% @doc: Fetches the full body of the request, if any is available.
 %%

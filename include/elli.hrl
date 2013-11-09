@@ -40,7 +40,7 @@
           headers :: headers(),
           body :: body(),
           pid :: pid(),
-          socket :: inet:socket(),
+          socket :: undefined | elli_tcp:socket(),
           callback :: callback()
 }).
 

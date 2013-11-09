@@ -41,7 +41,7 @@ body(#req{body = Body})          -> Body.
 peer(#req{socket = Socket} = Req) ->
     case get_header(<<"X-Forwarded-For">>, Req, undefined) of
         undefined ->
-            case inet:peername(Socket) of
+            case elli_tcp:peername(Socket) of
                 {ok, {Address, _}} ->
                     list_to_binary(inet_parse:ntoa(Address));
                 {error, _} ->

@@ -26,7 +26,7 @@
 -type req() :: record(req).
 -export_type([req/0, body/0]).
 
--record(state, {socket :: port(),
+-record(state, {socket :: elli_tcp:socket(),
                 acceptors :: [pid()],
                 open_reqs :: non_neg_integer(),
                 options :: [{_, _}],
