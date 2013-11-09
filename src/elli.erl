@@ -24,7 +24,7 @@
          terminate/2, code_change/3]).
 
 -type req() :: record(req).
--export_type([req/0, body/0]).
+-export_type([req/0, body/0, headers/0]).
 
 -record(state, {socket :: elli_tcp:socket(),
                 acceptors :: [pid()],
