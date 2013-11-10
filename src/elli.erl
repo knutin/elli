@@ -88,12 +88,14 @@ init([Opts]) ->
     HeaderTimeout  = proplists:get_value(header_timeout, Opts, 10000),
     BodyTimeout    = proplists:get_value(body_timeout, Opts, 30000),
     MaxBodySize    = proplists:get_value(max_body_size, Opts, 1024000),
+    Upgrade        = proplists:get_value(upgrade, Opts, false),
 
     Options = [{accept_timeout, AcceptTimeout},
                {request_timeout, RequestTimeout},
                {header_timeout, HeaderTimeout},
                {body_timeout, BodyTimeout},
-               {max_body_size, MaxBodySize}],
+               {max_body_size, MaxBodySize},
+               {upgrade, Upgrade}],
 
     %% Notify the handler that we are about to start accepting
     %% requests, so it can create necessary supporting processes, ETS
