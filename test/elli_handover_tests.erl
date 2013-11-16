@@ -10,6 +10,8 @@ elli_test_() ->
      fun setup/0, fun teardown/1,
      [
       ?_test(hello_world()),
+      ?_test(hello_maas()),
+      ?_test(salute()),      
       ?_test(echo())
      ]}.
 
@@ -39,6 +41,18 @@ hello_world() ->
     ?assertEqual([{"connection", "close"},
                   {"content-length", "12"}], headers(Response)),
     ?assertEqual("Hello World!", body(Response)).
+
+hello_maas() ->
+    {ok, Response} = httpc:request("http://localhost:3003/hello/maas"),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual([{"connection", "close"},
+                  {"content-length", "11"}], headers(Response)),
+    ?assertEqual("Hello Maas!", body(Response)).
+
+salute() ->
+    {ok, Response} = httpc:request("http://localhost:3003/salute?name=knut"),
+    ?assertEqual(200, status(Response)),
+    ?assertEqual("Hallo knut", body(Response)).
 
 echo() ->
     {ok, Response} = httpc:request("http://localhost:3003/hello?name=knut"),
