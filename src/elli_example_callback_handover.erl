@@ -1,7 +1,7 @@
 -module(elli_example_callback_handover).
 -export([init/2, handle/2, handle_event/3]).
 
-init(Req, Args) ->
+init(Req, _Args) ->
     case elli_request:path(Req) of
         [<<"hello">>, <<"world">>] ->
             {ok, handover};
@@ -9,7 +9,7 @@ init(Req, Args) ->
             ignore
     end.
 
-handle(Req, Args) ->
+handle(Req, _Args) ->
     handle(elli_request:method(Req), elli_request:path(Req), Req).
 
 

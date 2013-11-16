@@ -65,31 +65,31 @@ keepalive_loop(Socket, NumRequests, Buffer, Options, Callback) ->
 %% @doc: Handle a HTTP request that will possibly come on the
 %% socket. Returns the appropriate connection token and any buffer
 %% containing (parts of) the next request.
-handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
+handle_request(S, PrevB, Opts, {Mod, _} = Callback) ->
     {Method, RawPath, V, B0} = get_request(S, PrevB, Opts, Callback), t(request_start),
     {RequestHeaders, B1} = get_headers(S, V, B0, Opts, Callback),     t(headers_end),
 
     Req = mk_req(Method, RawPath, RequestHeaders, <<>>, V, S, Callback),
 
     case init(Req) of
-        {ok, standard} ->
+        {ok, standard, Req1} ->
             {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback), t(body_end),
-            Req1 = Req#req{body = RequestBody},
+            Req1 = Req1#req{body = RequestBody},
 
             t(user_start),
             Response = execute_callback(Req1),
             t(user_end),
 
             handle_response(Req1, B2, Response);
-        {ok, handover} ->
-            Req1 = Req#req{body = B1},
+        {ok, handover, #req{callback = {_,State}}=Req1} ->
+            Req2 = Req1#req{body = B1},
 
             t(user_start),
-            Response = Mod:handle(Req1, Args),
+            Response = Mod:handle(Req2, State),
             t(user_end),
 
             t(request_end),
-            handle_event(Mod, request_complete, [Req1, handover, [], <<>>, get_timings()], Args),
+            handle_event(Mod, request_complete, [Req2, handover, [], <<>>, get_timings()], State),
             Response
     end.
 
@@ -568,12 +568,14 @@ init(#req{callback = {Mod, Args}} = Req) ->
         true ->
             case Mod:init(Req, Args) of
                 ignore ->
-                    {ok, standard};
+                    {ok, standard, Req};
                 {ok, Behaviour} ->
-                    {ok, Behaviour}
+                    {ok, Behaviour, Req};
+                {ok, Behaviour, HandlerState} ->
+                    {ok, Behaviour, Req#req{callback={Mod, HandlerState}}}
             end;
         false ->
-            {ok, standard}
+            {ok, standard, Req}
     end.
 
 handle_event(Mod, Name, EventArgs, ElliArgs) ->
