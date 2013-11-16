@@ -72,16 +72,16 @@ handle_request(S, PrevB, Opts, {Mod, _} = Callback) ->
     Req = mk_req(Method, RawPath, RequestHeaders, <<>>, V, S, Callback),
 
     case init(Req) of
-        {ok, standard, Req1} ->
-            {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback), t(body_end),
-            Req1 = Req1#req{body = RequestBody},
+        {ok, standard, #req{callback = {Mod, _}=Callback1} = Req1} ->
+            {RequestBody, B2} = get_body(S, RequestHeaders, B1, Opts, Callback1), t(body_end),
+            Req2 = Req1#req{body = RequestBody},
 
             t(user_start),
-            Response = execute_callback(Req1),
+            Response = execute_callback(Req2),
             t(user_end),
 
             handle_response(Req1, B2, Response);
-        {ok, handover, #req{callback = {_,State}}=Req1} ->
+        {ok, handover, #req{callback = {Mod, State}} = Req1} ->
             Req2 = Req1#req{body = B1},
 
             t(user_start),
@@ -571,8 +571,8 @@ init(#req{callback = {Mod, Args}} = Req) ->
                     {ok, standard, Req};
                 {ok, Behaviour} ->
                     {ok, Behaviour, Req};
-                {ok, Behaviour, HandlerState} ->
-                    {ok, Behaviour, Req#req{callback={Mod, HandlerState}}}
+                {ok, Behaviour, CallbackState} ->
+                    {ok, Behaviour, Req#req{callback={Mod, CallbackState}}}
             end;
         false ->
             {ok, standard, Req}
