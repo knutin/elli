@@ -5,12 +5,6 @@ init(Req, _Args) ->
     case elli_request:path(Req) of
         [<<"hello">>, <<"world">>] ->
             {ok, handover};
-        [<<"hello">>, <<"maas">>] ->
-            % Pass state to handle in handover callback.
-            {ok, handover, <<"Maas">>}; 
-        [<<"salute">>] ->
-            % Pass state to normal in standard callback
-            {ok, standard, <<"Hallo ">>};
         _ ->
             ignore
     end.
@@ -26,18 +20,6 @@ handle('GET', [<<"hello">>, <<"world">>], Req, _Args) ->
                                        {"Content-Length", Size}], Body),
     {close, <<>>};
 
-handle('GET', [<<"hello">>, <<"maas">>], Req, State) ->
-    %% Use the passed state.
-    Body = <<"Hello ", State/binary, $!>>,
-    Size = list_to_binary(integer_to_list(size(Body))),
-    elli_http:send_response(Req, 200, [{"Connection", "close"},
-                                       {"Content-Length", Size}], Body),
-    {close, <<>>};
-
-handle('GET', [<<"salute">>], Req, State) ->
-    %% Fetch a GET argument from the URL, and use the state for a salute.
-    Name = elli_request:get_arg(<<"name">>, Req, <<"undefined">>),
-    {ok, [], <<State/binary, Name/binary>>};
 
 handle('GET', [<<"hello">>], Req, _Args) ->
     %% Fetch a GET argument from the URL.

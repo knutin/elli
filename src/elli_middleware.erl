@@ -63,7 +63,7 @@ handle_event(Event, Args, Config) ->
 
 do_init(_, []) ->
     {ok, standard};
-do_init(Req, [{Mod, Args} | Mods]) ->
+do_init(Req, [{Mod, Args}|Mods]) ->
     case erlang:function_exported(Mod, init, 2) of
         true ->
             case Mod:init(Req, Args) of
