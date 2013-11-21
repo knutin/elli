@@ -513,13 +513,9 @@ parse_path({absoluteURI, _Scheme, _Host, _Port, Path}) ->
 parse_path(_) ->
     {error, unsupported_uri}.
 
-split_path(<<"/", Path/binary>>) ->
-    path_trim(binary:split(Path, [<<"/">>], [global]));
 split_path(Path) ->
-    path_trim(binary:split(Path, [<<"/">>], [global])).
-
-path_trim(Path) ->
-    [P || P <- Path, P =/= <<>>].
+    [P || P <- binary:split(Path, [<<"/">>], [global]),
+          P =/= <<>>].
 
 %% @doc: Splits the url arguments into a proplist. Lifted from
 %% cowboy_http:x_www_form_urlencoded/2
