@@ -23,8 +23,50 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+
+%%%===================================================================
+%%% TYPES
+%%%===================================================================
+
+-type callback_mod() :: module().
+-type callback_args() :: any().
+-type callback() :: {callback_mod(), callback_args()}.
+
+-type path() :: binary().
+-type args() :: binary().
+-type version() :: {0,9} | {1,0} | {1,1}.
+-type header() :: {Key::binary(), Value::binary() | string()}.
+-type headers() :: [header()].
+-type body() :: binary() | iolist().
+-type response() :: iolist().
+-type http_method() :: 'OPTIONS' | 'GET' | 'HEAD' | 'POST' |
+                       'PUT' | 'DELETE' | 'TRACE' | binary().
+                       %% binary for other http methods
+
+-type response_code() :: 100..999.
+-type connection_token_atom() :: keep_alive | close.
+
+-type http_range() :: {First::non_neg_integer(), Last::non_neg_integer()} |
+                      {offset, Offset::non_neg_integer()} |
+                      {suffix, Length::pos_integer()}.
+
+-type range() :: {Offset::non_neg_integer(), Length::non_neg_integer()}.
+
+-type timestamp() :: {integer(), integer(), integer()}.
+-type elli_event() :: elli_startup |
+                      bad_request | file_error |
+                      chunk_complete | request_complete |
+                      request_throw | request_error | request_exit |
+                      request_closed | request_parse_error |
+                      client_closed | client_timeout.
+
+
 -type req() :: record(req).
--export_type([req/0, body/0]).
+
+-export_type([callback_mod/0, callback_args/0, callback/0, path/0,
+    args/0, version/0, header/0, headers/0, body/0, response/0,
+    http_method/0, response_code/0, connection_token_atom/0, 
+    http_range/0, range/0, timestamp/0, elli_event/0, req/0]).
 
 -record(state, {socket :: port(),
                 acceptors :: [pid()],

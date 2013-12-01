@@ -18,11 +18,11 @@
          parse_path/1, keepalive_loop/3, keepalive_loop/5]).
 
 
--spec start_link(pid(), port(), proplists:proplist(), callback()) -> pid().
+-spec start_link(pid(), port(), proplists:proplist(), elli:callback()) -> pid().
 start_link(Server, ListenSocket, Options, Callback) ->
     proc_lib:spawn_link(?MODULE, accept, [Server, ListenSocket, Options, Callback]).
 
--spec accept(pid(), port(), proplists:proplist(), callback()) -> ok.
+-spec accept(pid(), port(), proplists:proplist(), elli:callback()) -> ok.
 %% @doc: Accept on the socket until a client connects. Handles the
 %% request, then loops if we're using keep alive or chunked
 %% transfer. If accept doesn't give us a socket within 10 seconds, we
@@ -58,7 +58,7 @@ keepalive_loop(Socket, NumRequests, Buffer, Options, Callback) ->
             ok
     end.
 
--spec handle_request(port(), binary(), proplists:proplist(), callback()) ->
+-spec handle_request(port(), binary(), proplists:proplist(), elli:callback()) ->
                             {'keep_alive' | 'close', binary()}.
 %% @doc: Handle a HTTP request that will possibly come on the
 %% socket. Returns the appropriate connection token and any buffer
@@ -123,9 +123,9 @@ handle_request(S, PrevB, Opts, {Mod, Args} = Callback) ->
             {close_or_keepalive(Req, UserHeaders), B2}
     end.
 
--spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()}, RequestHeaders::headers(),
-             RequestBody::body(), V::version(), Socket::inet:socket() | undefined,
-             Callback::callback()) -> record(req).
+-spec mk_req(Method::elli:http_method(), {PathType::atom(), RawPath::binary()}, RequestHeaders::elli:headers(),
+             RequestBody::elli:body(), V::elli:version(), Socket::inet:socket() | undefined,
+             Callback::elli:callback()) -> elli:req().
 mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
     {Mod, Args} = Callback,
     case parse_path(RawPath) of
@@ -163,9 +163,9 @@ send_response(Socket, Method, Code, Headers, UserBody, {Mod, Args}) ->
     end.
 
 
--spec send_file(Socket::inet:socket(), Code::response_code(), Headers::headers(),
-                Filename::file:filename(), Range::range(),
-                Callback::callback()) -> ok.
+-spec send_file(Socket::inet:socket(), Code::elli:response_code(), Headers::elli:headers(),
+                Filename::file:filename(), Range::elli:range(),
+                Callback::elli:callback()) -> ok.
 %% @doc: Sends a HTTP response to the client where the body is the
 %% contents of the given file.  Assumes correctly set response code
 %% and headers.
@@ -337,8 +337,8 @@ get_request(Socket, Buffer, Options, {Mod, Args} = Callback) ->
             exit(normal)
     end.
 
--spec get_headers(port(), version(), binary(), proplists:proplist(), callback()) ->
-                         {headers(), any()}.
+-spec get_headers(port(), elli:version(), binary(), proplists:proplist(), elli:callback()) ->
+                         {elli:headers(), any()}.
 get_headers(_Socket, {0, 9}, _, _, _) ->
     {[], <<>>};
 get_headers(Socket, {1, _}, Buffer, Opts, Callback) ->
@@ -375,8 +375,8 @@ get_headers(Socket, Buffer, Headers, HeadersCount, Opts, {Mod, Args} = Callback)
             end
     end.
 
--spec get_body(port(), headers(), binary(),
-               proplists:proplist(), callback()) -> {body(), binary()}.
+-spec get_body(port(), elli:headers(), binary(),
+               proplists:proplist(), elli:callback()) -> {elli:body(), binary()}.
 %% @doc: Fetches the full body of the request, if any is available.
 %%
 %% At the moment we don't need to handle large requests, so there is
