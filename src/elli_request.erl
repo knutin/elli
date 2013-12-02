@@ -82,14 +82,14 @@ post_arg(Key, #req{} = Req, Default) ->
     proplists:get_value(Key, body_qs(Req), Default).
 
 
--spec get_args(#req{}) -> QueryArgs :: proplists:proplist().
+-spec get_args(elli:req()) -> QueryArgs :: proplists:proplist().
 %% @doc Returns a proplist of keys and values of the original query
 %%      string.  Both keys and values in the returned proplists will
 %%      be binaries or the atom `true' in case no value was supplied
 %%      for the query key.
 get_args(#req{args = Args}) -> Args.
 
--spec query_str(#req{}) -> QueryStr :: binary().
+-spec query_str(elli:req()) -> QueryStr :: binary().
 %% @doc Calculates the query string associated with the given Request
 %% as a binary.
 query_str(#req{raw_path = Path}) ->
@@ -99,7 +99,7 @@ query_str(#req{raw_path = Path}) ->
     end.
 
 
--spec get_range(#req{}) -> [http_range()] | parse_error.
+-spec get_range(elli:req()) -> [elli:http_range()] | parse_error.
 %% @doc: Parses the Range header from the request.
 %% The result is either a byte_range_set() or the atom `parse_error'.
 %% Use elli_util:normalize_range/2 to get a validated, normalized range.
@@ -111,7 +111,7 @@ get_range(#req{headers = Headers})  ->
     end.
 
 
--spec parse_range_set(Bin::binary()) -> [http_range()] | parse_error.
+-spec parse_range_set(Bin::binary()) -> [elli:http_range()] | parse_error.
 
 parse_range_set(<<ByteRangeSet/binary>>) ->
     RangeBins = binary:split(ByteRangeSet, <<",">>, [global]),
@@ -122,7 +122,7 @@ parse_range_set(<<ByteRangeSet/binary>>) ->
         false -> Parsed
     end.
 
--spec parse_range(Bin::binary()) -> http_range() | parse_error.
+-spec parse_range(Bin::binary()) -> elli:http_range() | parse_error.
 
 parse_range(<<$-, SuffixBin/binary>>) ->
     %% suffix-byte-range
