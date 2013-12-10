@@ -132,6 +132,8 @@ about benchmarking HTTP servers.
 
 ## Installation
 
+To use elli you will need a working installation of Erlang R15BXX (or later).
+
 Add elli to your application by adding it as a dependency to your
 rebar config.
 
