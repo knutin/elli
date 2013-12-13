@@ -9,7 +9,7 @@ is more important than general purpose features, then `elli` might be
 for you. If you find yourself digging into the implementation of a
 webserver, `elli` might be for you.
 
-Elli is used in production at Wooga.
+Elli is used in production at Wooga and Game Analytics.
 
 ## Features
 
@@ -18,7 +18,7 @@ Here's the features Elli *does* have:
  * Rack-style request-response. Your handler function gets a complete
    request and returns a complete response. There's no messaging, no
    receiving data directly from the socket, no writing responses
-   directly to the socket. It's a very simple straightforward
+   directly to the socket. It's a very simple and straightforward
    API. Have a look at `src/elli_example_callback.erl` for examples.
 
  * Middlewares allows you to add useful features like compression,
@@ -52,15 +52,24 @@ Here's the features Elli *does* have:
 
  * Pipelining
 
+ * SSL using built-in Erlang/OTP ssl, nice for low volume admin
+   interfaces, etc. For high volume, you should probably go with
+   nginx, stunnel or ELB if you're on AWS.
+
+ * Implement your own connection handling, for WebSockets, streaming
+   uploads, etc. See `src/elli_example_callback_handover.erl`
+
 
 ## Extensions
 
+ * WebSockets: https://github.com/mmzeeman/elli_websocket
  * Access log: https://github.com/wooga/elli_access_log
- * Real-time statistics dashboard: https://github.com/knutin/elli_stats
  * Basic auth: https://github.com/martinrehfeld/elli_basicauth
  * Static content: https://github.com/chrisavl/elli_fileserve
  * "Date" header: https://github.com/knutin/elli_date
  * Cookies: https://github.com/drfloob/elli_cookie
+ * Real-time statistics dashboard: https://github.com/knutin/elli_stats
+
 
 
 ## About

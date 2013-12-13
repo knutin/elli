@@ -6,7 +6,7 @@
 
 -export_type([socket/0]).
 
--type socket() :: {plain, inet:socket()} | {ssl, ssl:sslsocket()}. 
+-type socket() :: {plain, inet:socket()} | {ssl, ssl:sslsocket()}.
 
 listen(plain, Port, Opts) ->
     case gen_tcp:listen(Port, Opts) of
