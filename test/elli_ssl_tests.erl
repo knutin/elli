@@ -24,11 +24,12 @@ hello_world() ->
 
 
 setup() ->
+    application:start(asn1),
     application:start(crypto),
     application:start(public_key),
     application:start(ssl),
     inets:start(),
-    
+
     EbinDir = filename:dirname(code:which(?MODULE)),
     CertDir = filename:join([EbinDir, "..", "test"]),
     CertFile = filename:join(CertDir, "server_cert.pem"),

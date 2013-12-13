@@ -104,7 +104,7 @@ handle_response(Req, Buffer, {response, Code, UserHeaders, Body}) ->
     t(request_end),
     handle_event(Mod, request_complete, [Req, Code, Headers, Body, get_timings()], Args),
 
-    {close_or_keepalive(Req, UserHeaders), Buffer};    
+    {close_or_keepalive(Req, UserHeaders), Buffer};
 
 
 handle_response(Req, _Buffer, {chunk, UserHeaders, Initial}) ->
@@ -140,27 +140,6 @@ handle_response(Req, Buffer, {file, ResponseCode, UserHeaders, Filename, Range})
 
     {close_or_keepalive(Req, UserHeaders), Buffer}.
 
-
-
--spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()},
-             RequestHeaders::headers(), RequestBody::body(), V::version(),
-             Socket::elli_tcp:socket() | undefined, Callback::callback()) ->
-                    record(req).
-mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
-    {Mod, Args} = Callback,
-    case parse_path(RawPath) of
-        {ok, {Path, URL, URLArgs}} ->
-            #req{method = Method, path = URL, args = URLArgs, version = V,
-                 raw_path = Path, headers = RequestHeaders,
-                 body = RequestBody, pid = self(), socket = Socket,
-                 callback = Callback};
-        {error, Reason} ->
-            handle_event(Mod, request_parse_error,
-                         [{Reason, {Method, RawPath}}], Args),
-            send_bad_request(Socket),
-            elli_tcp:close(Socket),
-            exit(normal)
-    end.
 
 
 %% @doc: Generates a HTTP response and sends it to the client
@@ -464,6 +443,25 @@ check_max_size(Socket, ContentLength, Buffer, Opts, {Mod, Args}) ->
             ok
     end.
 
+-spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()},
+             RequestHeaders::headers(), RequestBody::body(), V::version(),
+             Socket::elli_tcp:socket() | undefined, Callback::callback()) ->
+                    record(req).
+mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
+    {Mod, Args} = Callback,
+    case parse_path(RawPath) of
+        {ok, {Path, URL, URLArgs}} ->
+            #req{method = Method, path = URL, args = URLArgs, version = V,
+                 raw_path = Path, headers = RequestHeaders,
+                 body = RequestBody, pid = self(), socket = Socket,
+                 callback = Callback};
+        {error, Reason} ->
+            handle_event(Mod, request_parse_error,
+                         [{Reason, {Method, RawPath}}], Args),
+            send_bad_request(Socket),
+            elli_tcp:close(Socket),
+            exit(normal)
+    end.
 
 %%
 %% HEADERS
