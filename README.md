@@ -1,6 +1,6 @@
 # elli - Erlang web server for HTTP APIs
 
-![Travis CI](https://secure.travis-ci.org/knutin/elli.png)
+[![Travis CI](https://travis-ci.org/knutin/elli.png)](https://travis-ci.org/knutin/elli)
 
 Elli is a webserver you can run inside your Erlang application to
 expose an HTTP API. Elli is a aimed exclusively at building
