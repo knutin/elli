@@ -163,6 +163,9 @@ handle('GET', [<<"403">>], _Req) ->
     %% authentication/authorization
     throw({403, [], <<"Forbidden">>});
 
+handle('GET', [<<"invalid_return">>], _Req) ->
+    {invalid_return};
+
 handle(_, _, _Req) ->
     {404, [], <<"Not Found">>}.
 
@@ -215,6 +218,11 @@ handle_event(request_complete, [_Request,
 handle_event(request_throw, [_Request, _Exception, _Stacktrace], _) -> ok;
 handle_event(request_error, [_Request, _Exception, _Stacktrace], _) -> ok;
 handle_event(request_exit, [_Request, _Exception, _Stacktrace], _) -> ok;
+
+%% invalid_return is sent if the user callback code returns a term not
+%% understood by elli, see elli_http:execute_callback/1.
+%% After triggering this event, a generated response is sent to the user.
+handle_event(invalid_return, [_Request, _ReturnValue], _) -> ok;
 
 
 %% chunk_complete fires when a chunked response is completely

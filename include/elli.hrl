@@ -29,7 +29,8 @@
                       chunk_complete | request_complete |
                       request_throw | request_error | request_exit |
                       request_closed | request_parse_error |
-                      client_closed | client_timeout.
+                      client_closed | client_timeout |
+                      invalid_return.
 
 -record(req, {
           method :: http_method(),
