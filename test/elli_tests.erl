@@ -13,6 +13,7 @@ elli_test_() ->
       ?_test(hello_world()),
       ?_test(not_found()),
       ?_test(crash()),
+      ?_test(invalid_return()),
       ?_test(no_compress()),
       ?_test(exception_flow()),
       ?_test(accept_content_type()),
@@ -79,6 +80,13 @@ crash() ->
                   {"content-length", "21"}], headers(Response)),
     ?assertEqual("Internal server error", body(Response)).
 
+invalid_return() ->
+    % Elli should return 500 for handlers returning bogus responses.
+    {ok, Response} = httpc:request("http://localhost:3001/invalid_return"),
+    ?assertEqual(500, status(Response)),
+    ?assertEqual([{"connection", "Keep-Alive"},
+                  {"content-length", "21"}], headers(Response)),
+    ?assertEqual("Internal server error", body(Response)).
 
 no_compress() ->
     {ok, Response} = httpc:request(get, {"http://localhost:3001/compressed",
@@ -408,10 +416,10 @@ get_range_test_() ->
     OffsetReq = #req{headers = [{<<"Range">>,<<"bytes=200-">>}]},
     UndefReq = #req{headers = []},
     BadReq   = #req{headers = [{<<"Range">>,<<"bytes=--99,hallo-world">>}]},
-    
+
     ByteRangeSet = [{bytes, 0, 99}, {bytes, 500, 999}, {suffix, 800}],
 
-    [?_assertEqual(ByteRangeSet,    elli_request:get_range(Req)),     
+    [?_assertEqual(ByteRangeSet,    elli_request:get_range(Req)),
      ?_assertEqual([{offset, 200}], elli_request:get_range(OffsetReq)),
      ?_assertEqual([],              elli_request:get_range(UndefReq)),
      ?_assertEqual(parse_error,     elli_request:get_range(BadReq))].
@@ -426,8 +434,8 @@ normalize_range_test_() ->
     Normal   = {200, 400},
     Set      = [{bytes, 0, 999}],
     EmptySet = [],
-    Invalid1 = {bytes, 400, 200}, 
-    Invalid2 = {bytes, 1200, 2000}, 
+    Invalid1 = {bytes, 400, 200},
+    Invalid2 = {bytes, 1200, 2000},
     Invalid3 = {offset, -10},
     Invalid4 = {offset, 2000},
     Invalid5 = parse_error,

@@ -220,7 +220,10 @@ execute_callback(#req{callback = {Mod, Args}} = Req) ->
         {HttpCode, Headers, {file, Filename, Range}} ->
             {file, HttpCode, Headers, Filename, Range};
         {HttpCode, Headers, Body}             -> {response, HttpCode, Headers, Body};
-        {HttpCode, Body}                      -> {response, HttpCode, [], Body}
+        {HttpCode, Body}                      -> {response, HttpCode, [], Body};
+        Unexpected                            ->
+            handle_event(Mod, invalid_return, [Req, Unexpected], Args),
+            {response, 500, [], <<"Internal server error">>}
     catch
         throw:{ResponseCode, Headers, Body} when is_integer(ResponseCode) ->
             {response, ResponseCode, Headers, Body};
