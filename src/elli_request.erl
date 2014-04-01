@@ -62,7 +62,8 @@ get_arg(Key, #req{} = Req) ->
     get_arg(Key, Req, undefined).
 
 get_arg(Key, #req{args = Args}, Default) ->
-    proplists:get_value(Key, Args, Default).
+    EncodedValue = proplists:get_value(Key, Args, Default),
+    list_to_binary(http_uri:decode(binary_to_list(EncodedValue))).
 
 %% @doc Parses application/x-www-form-urlencoded body into a proplist
 body_qs(#req{body = Body} = Req) ->

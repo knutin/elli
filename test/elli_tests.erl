@@ -19,6 +19,7 @@ elli_test_() ->
       ?_test(accept_content_type()),
       ?_test(user_connection()),
       ?_test(get_args()),
+      ?_test(get_encoded_args()),
       ?_test(post_args()),
       ?_test(shorthand()),
       ?_test(too_many_headers()),
@@ -123,6 +124,10 @@ user_connection() ->
 get_args() ->
     {ok, Response} = httpc:request("http://localhost:3001/hello?name=knut"),
     ?assertEqual("Hello knut", body(Response)).
+
+get_encoded_args() ->
+    {ok, Response} = httpc:request("http://localhost:3001/hello?name=knut%3D"),
+    ?assertEqual("Hello knut=", body(Response)).
 
 post_args() ->
     Body = <<"name=foo&baz=quux">>,
