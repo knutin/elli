@@ -46,6 +46,11 @@ handle('GET', [<<"hello">>, <<"iolist">>], Req) ->
     Name = elli_request:get_arg(<<"name">>, Req),
     {ok, [], [<<"Hello ">>, Name]};
 
+handle('GET', [<<"decoded-hello">>], Req) ->
+    %% Fetch a URI decoded GET argument from the URL.
+    Name = elli_request:get_arg_decoded(<<"name">>, Req, <<"undefined">>),
+    {ok, [], <<"Hello ", Name/binary>>};
+
 handle('GET', [<<"type">>], Req) ->
     Name = elli_request:get_arg(<<"name">>, Req),
     %% Fetch a header.

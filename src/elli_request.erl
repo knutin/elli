@@ -10,6 +10,8 @@
          , raw_path/1
          , query_str/1
          , get_header/2
+         , get_arg_decoded/2
+         , get_arg_decoded/3
          , get_arg/2
          , get_arg/3
          , get_args/1
@@ -62,6 +64,12 @@ get_arg(Key, #req{} = Req) ->
     get_arg(Key, Req, undefined).
 
 get_arg(Key, #req{args = Args}, Default) ->
+    proplists:get_value(Key, Args, Default).
+
+get_arg_decoded(Key, #req{} = Req) ->
+    get_arg(Key, Req, undefined).
+
+get_arg_decoded(Key, #req{args = Args}, Default) ->
     EncodedValue = proplists:get_value(Key, Args, Default),
     list_to_binary(http_uri:decode(binary_to_list(EncodedValue))).
 
