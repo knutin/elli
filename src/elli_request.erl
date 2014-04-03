@@ -67,7 +67,7 @@ get_arg(Key, #req{args = Args}, Default) ->
     proplists:get_value(Key, Args, Default).
 
 get_arg_decoded(Key, #req{} = Req) ->
-    get_arg(Key, Req, undefined).
+    get_arg_decoded(Key, Req, undefined).
 
 get_arg_decoded(Key, #req{args = Args}, Default) ->
     EncodedValue = proplists:get_value(Key, Args, Default),
