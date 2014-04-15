@@ -38,6 +38,8 @@ accept({ssl, Socket}, Timeout) ->
             case ssl:ssl_accept(S, Timeout) of
                 ok ->
                     {ok, {ssl, S}};
+                {error, closed} ->
+                    {error, econnaborted};
                 {error, Reason} ->
                     {error, Reason}
             end;
