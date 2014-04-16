@@ -39,6 +39,8 @@ accept(Server, ListenSocket, Options, Callback) ->
             ?MODULE:accept(Server, ListenSocket, Options, Callback);
         {error, econnaborted} ->
             ?MODULE:accept(Server, ListenSocket, Options, Callback);
+        {error, {tls_alert, _}} ->
+            ?MODULE:accept(Server, ListenSocket, Options, Callback);
         {error, closed} ->
             ok;
         {error, Other} ->
