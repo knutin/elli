@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v1.0.1
+
+ * Fix bug in SSL acceptor pool where due to failed handshakes, Elli
+   runs out of acceptors. Thanks to Stefan Grundmann.
+
+ * In case a handler (or middleware) returns a response Elli does not
+   understand, Elli will now respond with a 500 error. Thanks to
+   Johannes Huning.
+
+ * Added `elli_request:get_arg_decoded/2,3` which HTTP URI decodes the
+   value passed in the request. Thanks to Mariano Valles.
+
 ## v1.0
 
  * SSL using built-in ssl from Erlang/OTP. Thanks to Maas-Maarten Zeeman.
