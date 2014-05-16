@@ -7,9 +7,11 @@ expose an HTTP API. Elli is a aimed exclusively at building
 high-throughput, low-latency HTTP APIs. If robustness and performance
 is more important than general purpose features, then `elli` might be
 for you. If you find yourself digging into the implementation of a
-webserver, `elli` might be for you.
+webserver, `elli` might be for you. If you're building web services,
+not web sites, then `elli` might be for you.
 
-Elli is used in production at Wooga and Game Analytics.
+Elli is used in production at Wooga and Game Analytics. Elli requires
+R15 or newer.
 
 ## Features
 
@@ -50,7 +52,12 @@ Here's the features Elli *does* have:
 
  * Chunked transfer in responses for real-time push to clients
 
- * Pipelining
+ * Basic pipelining. HTTP verbs that does not have side-effects(`GET`
+   and `HEAD`) can be pipelined, ie. a client supporting pipelining
+   can send multiple requests down the line and expect the responses
+   to appear in the same order as requests. Elli processes the
+   requests one at a time in order, future work could make it possible
+   to process them in parallel.
 
  * SSL using built-in Erlang/OTP ssl, nice for low volume admin
    interfaces, etc. For high volume, you should probably go with
