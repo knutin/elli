@@ -46,11 +46,6 @@ handle('GET', [<<"hello">>, <<"iolist">>], Req) ->
     Name = elli_request:get_arg(<<"name">>, Req),
     {ok, [], [<<"Hello ">>, Name]};
 
-handle('GET', [<<"decoded-hello">>], Req) ->
-    %% Fetch a URI decoded GET argument from the URL.
-    Name = elli_request:get_arg_decoded(<<"name">>, Req, <<"undefined">>),
-    {ok, [], <<"Hello ", Name/binary>>};
-
 handle('GET', [<<"type">>], Req) ->
     Name = elli_request:get_arg(<<"name">>, Req),
     %% Fetch a header.
@@ -95,6 +90,17 @@ handle('GET', [<<"crash">>], _Req) ->
     %% Throwing an exception results in a 500 response and
     %% request_throw being called
     throw(foobar);
+
+handle('GET', [<<"decoded-hello">>], Req) ->
+    %% Fetch a URI decoded GET argument from the URL.
+    Name = elli_request:get_arg_decoded(<<"name">>, Req, <<"undefined">>),
+    {ok, [], <<"Hello ", Name/binary>>};
+
+handle('GET', [<<"decoded-list">>], Req) ->
+    %% Fetch a URI decoded GET argument from the URL.
+    [{<<"name">>, Name}] = elli_request:get_args_decoded(Req),
+    {ok, [], <<"Hello ", Name/binary>>};
+
 
 handle('GET', [<<"sendfile">>], _Req) ->
     %% Returning {file, "/path/to/file"} instead of the body results

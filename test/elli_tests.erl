@@ -20,6 +20,7 @@ elli_test_() ->
       ?_test(user_connection()),
       ?_test(get_args()),
       ?_test(decoded_get_args()),
+      ?_test(decoded_get_args_list()),
       ?_test(post_args()),
       ?_test(shorthand()),
       ?_test(too_many_headers()),
@@ -127,6 +128,10 @@ get_args() ->
 
 decoded_get_args() ->
     {ok, Response} = httpc:request("http://localhost:3001/decoded-hello?name=knut%3D"),
+    ?assertEqual("Hello knut=", body(Response)).
+
+decoded_get_args_list() ->
+    {ok, Response} = httpc:request("http://localhost:3001/decoded-list?name=knut%3D"),
     ?assertEqual("Hello knut=", body(Response)).
 
 post_args() ->

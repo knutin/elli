@@ -15,6 +15,7 @@
          , get_arg/2
          , get_arg/3
          , get_args/1
+         , get_args_decoded/1
          , post_arg/2
          , post_arg/3
          , body_qs/1
@@ -95,8 +96,16 @@ post_arg(Key, #req{} = Req, Default) ->
 %% @doc Returns a proplist of keys and values of the original query
 %%      string.  Both keys and values in the returned proplists will
 %%      be binaries or the atom `true' in case no value was supplied
-%%      for the query key.
+%%      for the query value.
 get_args(#req{args = Args}) -> Args.
+
+get_args_decoded(#req{args = Args}) ->
+    lists:map(fun ({K, true}) ->
+                      {K, true};
+                  ({K, V}) ->
+                      {K, list_to_binary(http_uri:decode(binary_to_list(V)))}
+              end, Args).
+
 
 -spec query_str(#req{}) -> QueryStr :: binary().
 %% @doc Calculates the query string associated with the given Request
