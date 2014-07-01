@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v1.0.2
+
+ * Added `elli_request:get_args_decoded/1` which returns the list of
+   query args decoded each time it's called.
+
+
 ## v1.0.1
 
  * Fix bug in SSL acceptor pool where due to failed handshakes, Elli

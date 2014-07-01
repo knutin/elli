@@ -131,7 +131,7 @@ decoded_get_args() ->
     ?assertEqual("Hello knut=", body(Response)).
 
 decoded_get_args_list() ->
-    {ok, Response} = httpc:request("http://localhost:3001/decoded-list?name=knut%3D"),
+    {ok, Response} = httpc:request("http://localhost:3001/decoded-list?name=knut%3D&foo"),
     ?assertEqual("Hello knut=", body(Response)).
 
 post_args() ->

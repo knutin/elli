@@ -98,7 +98,7 @@ handle('GET', [<<"decoded-hello">>], Req) ->
 
 handle('GET', [<<"decoded-list">>], Req) ->
     %% Fetch a URI decoded GET argument from the URL.
-    [{<<"name">>, Name}] = elli_request:get_args_decoded(Req),
+    [{<<"name">>, Name}, {<<"foo">>, true}] = elli_request:get_args_decoded(Req),
     {ok, [], <<"Hello ", Name/binary>>};
 
 
