@@ -10,6 +10,7 @@
          , raw_path/1
          , query_str/1
          , get_header/2
+         , get_header/3
          , get_arg_decoded/2
          , get_arg_decoded/3
          , get_arg/2
@@ -18,13 +19,16 @@
          , get_args_decoded/1
          , post_arg/2
          , post_arg/3
+         , post_arg_decoded/2
+         , post_arg_decoded/3
+         , post_args/1
+         , post_args_decoded/1
          , body_qs/1
          , headers/1
          , peer/1
          , method/1
          , body/1
          , get_range/1
-         , get_header/3
          , to_proplist/1
          , is_request/1
         ]).
@@ -91,6 +95,13 @@ post_arg(Key, #req{} = Req) ->
 post_arg(Key, #req{} = Req, Default) ->
     proplists:get_value(Key, body_qs(Req), Default).
 
+post_arg_decoded(Key, #req{} = Req) ->
+    post_arg_decoded(Key, #req{} = Req, undefined).
+
+post_arg_decoded(Key, #req{} = Req, Default) ->
+    EncodedValue = proplists:get_value(Key, body_qs(Req), Default),
+    list_to_binary(http_uri:decode(binary_to_list(EncodedValue))).
+
 
 -spec get_args(#req{}) -> QueryArgs :: proplists:proplist().
 %% @doc Returns a proplist of keys and values of the original query
@@ -106,6 +117,16 @@ get_args_decoded(#req{args = Args}) ->
                       {K, list_to_binary(http_uri:decode(binary_to_list(V)))}
               end, Args).
 
+
+post_args(#req{} = Req) ->
+    body_qs(Req).
+
+post_args_decoded(#req{} = Req) ->
+    lists:map(fun ({K, true}) ->
+                      {K, true};
+                  ({K, V}) ->
+                      {K, list_to_binary(http_uri:decode(binary_to_list(V)))}
+              end, body_qs(Req)).
 
 -spec query_str(#req{}) -> QueryStr :: binary().
 %% @doc Calculates the query string associated with the given Request

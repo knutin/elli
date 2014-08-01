@@ -135,7 +135,7 @@ decoded_get_args_list() ->
     ?assertEqual("Hello knut=", body(Response)).
 
 post_args() ->
-    Body = <<"name=foo&baz=quux">>,
+    Body = <<"name=foo&city=New%20York">>,
     ContentType = "application/x-www-form-urlencoded",
 
     {ok, Response} = httpc:request(
@@ -143,7 +143,7 @@ post_args() ->
                        {"http://localhost:3001/hello", [], ContentType, Body},
                        [], []),
     ?assertEqual(200, status(Response)),
-    ?assertEqual("Hello foo", body(Response)).
+    ?assertEqual("Hello foo of New York", body(Response)).
 
 shorthand() ->
     {ok, Response} = httpc:request("http://localhost:3001/shorthand"),
@@ -268,7 +268,7 @@ slow_client() ->
 
 
 post_pipeline() ->
-    Body = <<"name=elli">>,
+    Body = <<"name=elli&city=New%20York">>,
     Headers = <<"Content-Length: ",(?i2b(size(Body)))/binary, "\r\n",
                 "Content-Type: application/x-www-form-urlencoded", "\r\n",
                 "\r\n">>,
@@ -283,9 +283,9 @@ post_pipeline() ->
 
     ExpectedResponse = <<"HTTP/1.1 200 OK\r\n"
                          "Connection: Keep-Alive\r\n"
-                         "Content-Length: 10\r\n"
+                         "Content-Length: 22\r\n"
                          "\r\n"
-                         "Hello elli">>,
+                         "Hello elli of New York">>,
 
     {ok, Res} = gen_tcp:recv(Socket, size(ExpectedResponse) * 2),
 

@@ -39,7 +39,9 @@ handle('GET', [<<"hello">>], Req) ->
 handle('POST', [<<"hello">>], Req) ->
     %% Fetch a POST argument from the POST body.
     Name = elli_request:post_arg(<<"name">>, Req, <<"undefined">>),
-    {ok, [], <<"Hello ", Name/binary>>};
+    %% Fetch and decode
+    City = elli_request:post_arg_decoded(<<"city">>, Req, <<"undefined">>),
+    {ok, [], <<"Hello ", Name/binary, " of ", City/binary>>};
 
 handle('GET', [<<"hello">>, <<"iolist">>], Req) ->
     %% Iolists will be kept as iolists all the way to the socket.
