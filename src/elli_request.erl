@@ -79,6 +79,7 @@ get_arg_decoded(Key, #req{args = Args}, Default) ->
     list_to_binary(http_uri:decode(binary_to_list(EncodedValue))).
 
 %% @doc Parses application/x-www-form-urlencoded body into a proplist
+body_qs(#req{body = <<>>}) -> [];
 body_qs(#req{body = Body} = Req) ->
     case get_header(<<"Content-Type">>, Req) of
         <<"application/x-www-form-urlencoded">> ->
