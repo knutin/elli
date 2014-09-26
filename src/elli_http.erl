@@ -260,7 +260,7 @@ chunk_loop(Socket) ->
         {tcp_closed, Socket} ->
             {error, client_closed};
 
-        {chunk, <<>>} ->
+        {chunk, close} ->
             case elli_tcp:send(Socket, <<"0\r\n\r\n">>) of
                 ok ->
                     elli_tcp:close(Socket),
@@ -268,7 +268,7 @@ chunk_loop(Socket) ->
                 {error, Closed} when Closed =:= closed orelse Closed =:= enotconn ->
                     {error, client_closed}
             end;
-        {chunk, <<>>, From} ->
+        {chunk, close, From} ->
             case elli_tcp:send(Socket, <<"0\r\n\r\n">>) of
                 ok ->
                     elli_tcp:close(Socket),
@@ -296,9 +296,12 @@ chunk_loop(Socket) ->
 
 
 send_chunk(Socket, Data) ->
-    Size = integer_to_list(iolist_size(Data), 16),
-    Response = [Size, <<"\r\n">>, Data, <<"\r\n">>],
-    elli_tcp:send(Socket, Response).
+    case iolist_size(Data) of
+        0 -> ok;
+        Size ->
+            Response = [integer_to_list(Size, 16), <<"\r\n">>, Data, <<"\r\n">>],
+            elli_tcp:send(Socket, Response)
+    end.
 
 
 %%
