@@ -209,7 +209,7 @@ chunk_ref(#req{}) ->
 %% @doc: Explicitly close the chunked connection. Returns {error,
 %% closed} if the client already closed the connection.
 close_chunk(Ref) ->
-    send_chunk(Ref, <<"">>).
+    send_chunk(Ref, close).
 
 %% @doc: Sends a chunk asynchronously
 async_send_chunk(Ref, Data) ->
