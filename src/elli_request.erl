@@ -75,8 +75,11 @@ get_arg_decoded(Key, #req{} = Req) ->
     get_arg_decoded(Key, Req, undefined).
 
 get_arg_decoded(Key, #req{args = Args}, Default) ->
-    EncodedValue = proplists:get_value(Key, Args, Default),
-    list_to_binary(http_uri:decode(binary_to_list(EncodedValue))).
+    case proplists:get_value(Key, Args) of
+        undefined -> Default;
+        EncodedValue ->
+            list_to_binary(http_uri:decode(binary_to_list(EncodedValue)))
+    end.
 
 %% @doc Parses application/x-www-form-urlencoded body into a proplist
 body_qs(#req{body = <<>>}) -> [];
@@ -100,8 +103,11 @@ post_arg_decoded(Key, #req{} = Req) ->
     post_arg_decoded(Key, #req{} = Req, undefined).
 
 post_arg_decoded(Key, #req{} = Req, Default) ->
-    EncodedValue = proplists:get_value(Key, body_qs(Req), Default),
-    list_to_binary(http_uri:decode(binary_to_list(EncodedValue))).
+    case proplists:get_value(Key, body_qs(Req)) of
+        undefined -> Default;
+        EncodedValue ->
+            list_to_binary(http_uri:decode(binary_to_list(EncodedValue)))
+    end.
 
 
 -spec get_args(#req{}) -> QueryArgs :: proplists:proplist().
