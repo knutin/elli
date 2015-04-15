@@ -256,8 +256,9 @@ start_chunk_loop(Socket) ->
     ?MODULE:chunk_loop(Socket).
 
 chunk_loop(Socket) ->
+    {_SockType, InnerSocket} = Socket,
     receive
-        {tcp_closed, Socket} ->
+        {tcp_closed, InnerSocket} ->
             {error, client_closed};
 
         {chunk, close} ->
