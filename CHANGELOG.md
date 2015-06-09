@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.0.3
+
+ * Various internal cleanup fixes from Andreas Stenius (github.com/kaos)
+
 ## v1.0.2
 
  * Added `elli_request:get_args_decoded/1` which returns the list of

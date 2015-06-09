@@ -5,3 +5,4 @@ ebin/**
 *~
 #*
 .dialyzer.plt
+.rebar
