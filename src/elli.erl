@@ -27,7 +27,7 @@
 -export_type([req/0, body/0, headers/0]).
 
 -record(state, {socket :: elli_tcp:socket(),
-                acceptors :: [pid()],
+                acceptors :: non_neg_integer(),
                 open_reqs :: non_neg_integer(),
                 options :: [{_, _}],
                 callback :: callback()
@@ -116,9 +116,13 @@ init([Opts]) ->
                                                     {active, false}
                                                     | SSLSockOpts
                                                    ]),
-    Acceptors = [elli_http:start_link(self(), Socket, Options,
-                                      {Callback, CallbackArgs})
-                 || _ <- lists:seq(1, MinAcceptors)],
+
+    Acceptors = ets:new(acceptors, [private, set]),
+    StartAcc  = fun() ->
+        Pid = elli_http:start_link(self(), Socket, Options, {Callback, CallbackArgs}),
+        ets:insert(Acceptors, {Pid})
+    end,
+    [ StartAcc() || _ <- lists:seq(1, MinAcceptors)],
 
     {ok, #state{socket = Socket,
                 acceptors = Acceptors,
@@ -128,7 +132,8 @@ init([Opts]) ->
 
 
 handle_call(get_acceptors, _From, State) ->
-    {reply, {ok, State#state.acceptors}, State};
+    Acceptors = [Pid || {Pid} <- ets:tab2list(State#state.acceptors)],
+    {reply, {ok, Acceptors}, State};
 
 handle_call(get_open_reqs, _From, State) ->
     {reply, {ok, State#state.open_reqs}, State};
@@ -171,14 +176,14 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 remove_acceptor(State, Pid) ->
-    State#state{acceptors = lists:delete(Pid, State#state.acceptors),
-                open_reqs = State#state.open_reqs - 1}.
+    ets:delete(State#state.acceptors, Pid),
+    State#state{open_reqs = State#state.open_reqs - 1}.
 
 start_add_acceptor(State) ->
     Pid = elli_http:start_link(self(), State#state.socket,
                                State#state.options, State#state.callback),
-    State#state{acceptors = [Pid | State#state.acceptors],
-                open_reqs = State#state.open_reqs + 1}.
+    ets:insert(State#state.acceptors, {Pid}),
+    State#state{open_reqs = State#state.open_reqs + 1}.
 
 
 required_opt(Name, Opts) ->
