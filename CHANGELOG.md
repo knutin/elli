@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.0.4
+
+ * OTP 18.0 compatibility, contributed by Florian Odronitz.
+
 ## v1.0.3
 
  * Various internal cleanup fixes from Andreas Stenius (github.com/kaos)
