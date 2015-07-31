@@ -9,13 +9,13 @@
 
 -module(elli_test).
 
--include("../include/elli.hrl").
+-include("elli.hrl").
 
 -export([call/5]).
 
 -spec call(Method::http_method(), Path::binary(),
            Headers::headers(), Body::body(), Opts::proplists:proplist()) ->
-                  record(req).
+           #req{}.
 call(Method, Path, Headers, Body, Opts) ->
     Callback = proplists:get_value(callback, Opts),
     CallbackArgs = proplists:get_value(callback_args, Opts),

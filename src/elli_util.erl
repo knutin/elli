@@ -1,5 +1,5 @@
 -module(elli_util).
--include("../include/elli.hrl").
+-include("elli.hrl").
 -include("elli_util.hrl").
 
 -include_lib("kernel/include/file.hrl").

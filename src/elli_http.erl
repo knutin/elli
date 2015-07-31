@@ -4,8 +4,8 @@
 %% connects. It then handles requests on that connection until it's
 %% closed either by the client timing out or explicitly by the user.
 -module(elli_http).
--include("../include/elli.hrl").
--include("../include/elli_util.hrl").
+-include("elli.hrl").
+-include("elli_util.hrl").
 
 
 %% API
@@ -455,7 +455,7 @@ check_max_size(Socket, ContentLength, Buffer, Opts, {Mod, Args}) ->
 -spec mk_req(Method::http_method(), {PathType::atom(), RawPath::binary()},
              RequestHeaders::headers(), RequestBody::body(), V::version(),
              Socket::elli_tcp:socket() | undefined, Callback::callback()) ->
-                    record(req).
+             #req{}.
 mk_req(Method, RawPath, RequestHeaders, RequestBody, V, Socket, Callback) ->
     {Mod, Args} = Callback,
     case parse_path(RawPath) of
