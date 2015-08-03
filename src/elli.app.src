@@ -7,5 +7,9 @@
                   kernel,
                   stdlib
                  ]},
-  {env, []}
+  {env, []},
+
+  {contributors,["Knut Nesheim"]},
+  {licenses,["MIT"]},
+  {links,[{"Github","https://github.com/knutin/elli"}]}
  ]}.
