@@ -9,7 +9,8 @@ elli_test_() ->
      [
       ?_test(hello_world()),
       ?_test(short_circuit()),
-      ?_test(compress())
+      ?_test(compress()),
+      ?_test(compress_file())
      ]}.
 
 %%
@@ -57,8 +58,18 @@ compress() ->
                   {"content-length", "1032"}], headers(Response3)),
     ?assertEqual(lists:flatten(lists:duplicate(86, "Hello World!")), body(Response3)).
 
+compress_file() ->
+    {ok, Response} = httpc:request(get, {"http://localhost:3002/sendfile",
+                                         [{"Accept-Encoding", "gzip"}]}, [], []),
+    ?assertEqual(200, status(Response)),
+    {ok, Readme} = file:read_file("../README.md"),
+    ?assertEqual(Readme, zlib:gunzip(body(Response))),
 
-
+    % Do it twice to check caching
+    {ok, Response2} = httpc:request(get, {"http://localhost:3002/sendfile",
+                                         [{"Accept-Encoding", "gzip"}]}, [], []),
+    ?assertEqual(200, status(Response2)),
+    ?assertEqual(body(Response), body(Response2)).
 
 
 %%
@@ -88,6 +99,7 @@ setup() ->
                                          {port, 514}]},
                       {elli_example_middleware, []},
                       {elli_middleware_compress, []},
+                      {elli_middleware_file_compress, [{compress_cache_dir, "/tmp"}]},
                       {elli_example_callback, []}
                      ]}
              ],
@@ -100,5 +112,3 @@ setup() ->
 
 teardown(Pids) ->
     [elli:stop(P) || P <- Pids].
-
-
