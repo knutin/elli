@@ -2,7 +2,7 @@
 %% mochiweb_socket.erl
 
 -module(elli_tcp).
--export([listen/3, accept/2, recv/3, send/2, close/1, setopts/2, sendfile/5, peername/1]).
+-export([listen/3, accept/3, recv/3, send/2, close/1, setopts/2, sendfile/5, peername/1]).
 
 -export_type([socket/0]).
 
@@ -25,16 +25,18 @@ listen(ssl, Port, Opts) ->
     end.
 
 
-accept({plain, Socket}, Timeout) ->
+accept({plain, Socket}, Server, Timeout) ->
     case gen_tcp:accept(Socket, Timeout) of
         {ok, S} ->
+            gen_server:cast(Server, accepted),
             {ok, {plain, S}};
         {error, Reason} ->
             {error, Reason}
     end;
-accept({ssl, Socket}, Timeout) ->
+accept({ssl, Socket}, Server, Timeout) ->
     case ssl:transport_accept(Socket, Timeout) of
         {ok, S} ->
+            gen_server:cast(Server, accepted),
             case ssl:ssl_accept(S, Timeout) of
                 ok ->
                     {ok, {ssl, S}};

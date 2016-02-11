@@ -30,10 +30,9 @@ start_link(Server, ListenSocket, Options, Callback) ->
 %% transfer. If accept doesn't give us a socket within a configurable
 %% timeout, we loop to allow code upgrades of this module.
 accept(Server, ListenSocket, Options, Callback) ->
-    case catch elli_tcp:accept(ListenSocket, accept_timeout(Options)) of
+    case catch elli_tcp:accept(ListenSocket, Server, accept_timeout(Options)) of
         {ok, Socket} ->
             t(accepted),
-            gen_server:cast(Server, accepted),
             ?MODULE:keepalive_loop(Socket, Options, Callback);
         {error, timeout} ->
             ?MODULE:accept(Server, ListenSocket, Options, Callback);
@@ -557,13 +556,13 @@ split_path(Path) ->
 %% cowboy_http:x_www_form_urlencoded/2
 -spec split_args(binary()) -> list({binary(), binary() | true}).
 split_args(<<>>) ->
-	[];
+    [];
 split_args(Qs) ->
-	Tokens = binary:split(Qs, <<"&">>, [global, trim]),
-	[case binary:split(Token, <<"=">>) of
-		[Token] -> {Token, true};
-		[Name, Value] -> {Name, Value}
-	end || Token <- Tokens].
+    Tokens = binary:split(Qs, <<"&">>, [global, trim]),
+    [case binary:split(Token, <<"=">>) of
+        [Token] -> {Token, true};
+        [Name, Value] -> {Name, Value}
+    end || Token <- Tokens].
 
 
 %%
