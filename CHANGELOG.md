@@ -1,4 +1,9 @@
 # CHANGELOG
+## v1.0.5
+
+ * Optimization of SSL accept by Tristan Sloughter
+
+ * Dependency cleanup by Adam Lindberg
 
 ## v1.0.4
 
