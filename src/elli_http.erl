@@ -392,6 +392,8 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
         undefined ->
             {<<>>, Buffer};
         ContentLengthBin ->
+            maybe_send_continue(Socket, Headers),
+
             ContentLength = ?b2i(binary:replace(ContentLengthBin,
                                                 <<" ">>, <<>>, [global])),
 
@@ -423,6 +425,18 @@ get_body(Socket, Headers, Buffer, Opts, {Mod, Args} = Callback) ->
 ensure_binary(Bin) when is_binary(Bin) -> Bin;
 ensure_binary(Atom) when is_atom(Atom) -> atom_to_binary(Atom, latin1).
 
+maybe_send_continue(Socket, Headers) ->
+    % According to RFC2616 section 8.2.3 an origin server must respond with
+    % either a "100 Continue" or a final response code when the client
+    % headers contains "Expect:100-continue"
+    case proplists:get_value(<<"Expect">>, Headers, undefined) of
+        <<"100-continue">> ->
+            Response = [<<"HTTP/1.1 ">>, status(100), <<"\r\n">>,
+                        <<"Content-Length: 0">>, <<"\r\n\r\n">>],
+            elli_tcp:send(Socket, Response);
+        _Other ->
+            ok
+    end.
 
 check_max_size(Socket, ContentLength, Buffer, Opts, {Mod, Args}) ->
     case ContentLength > max_body_size(Opts) of
