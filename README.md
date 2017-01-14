@@ -112,11 +112,14 @@ from the big names.
 
 ## Why another webserver? Isn't this just the NIH syndrome?
 
-Yaws, Mochiweb, Misultin and Cowboy are great projects, hardened over
-time and full of very useful features for web development. If you
-value developer productivity, Yaws is an excellent choice. If you want
-a fast and lightweight server, Mochiweb and Cowboy are excellent
-choices.
+[Yaws](https://github.com/klacke/yaws),
+[Mochiweb](https://github.com/mochi/mochiweb),
+[Misultin](https://github.com/ostinelli/misultin), and
+[Cowboy](https://github.com/ninenines/cowboy) are great projects,
+hardened over time and full of very useful features for web
+development. If you value developer productivity, Yaws is an
+excellent choice. If you want a fast and lightweight server, Mochiweb
+and Cowboy are excellent choices.
 
 Having used and studied all of these projects, we believed that if we
 merged some of the existing ideas and added some ideas from other
