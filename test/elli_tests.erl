@@ -36,7 +36,8 @@ elli_test_() ->
       ?_test(post_pipeline()),
       ?_test(get_pipeline()),
       ?_test(head()),
-      ?_test(no_body())
+      ?_test(no_body()),
+      ?_test(sends_continue())
      ]}.
 
 
@@ -336,8 +337,30 @@ no_body() ->
                   {"etag", "foobar"}], headers(Response)),
     ?assertEqual([], body(Response)).
 
+sends_continue() ->
+    {ok, Socket} = gen_tcp:connect("127.0.0.1", 3001, [{active, false}, binary]),
 
+    Body = <<"name=elli&city=New%20York">>,
+    Length = ?i2b(size(Body)),
 
+    Req = <<"POST /hello HTTP/1.1\r\n",
+            "Host: localhost\r\n",
+            "Content-Type: application/x-www-form-urlencoded\r\n",
+            "Content-Length: ", Length/binary, "\r\n",
+            "Expect: 100-continue\r\n\r\n">>,
+
+    gen_tcp:send(Socket, Req),
+    ?assertEqual({ok, <<"HTTP/1.1 100 Continue\r\n"
+                        "Content-Length: 0\r\n\r\n">>},
+                 gen_tcp:recv(Socket, 0)),
+    % Send Result of the body
+    gen_tcp:send(Socket, Body),
+    ExpectedResponse = <<"HTTP/1.1 200 OK\r\n"
+                         "Connection: Keep-Alive\r\n"
+                         "Content-Length: 22\r\n"
+                         "\r\n"
+                         "Hello elli of New York">>,
+    ?assertEqual({ok, ExpectedResponse}, gen_tcp:recv(Socket, size(ExpectedResponse))).
 
 %%
 %% Slow client, sending only the specified byte size every millisecond
