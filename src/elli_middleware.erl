@@ -11,6 +11,7 @@
 %%            {mods, [
 %%                    {elli_example_middleware, []},
 %%                    {elli_middleware_compress, []},
+%%                    {elli_middleware_file_compress, []},
 %%                    {elli_example_callback, []}
 %%                   ]}
 %%             ],
