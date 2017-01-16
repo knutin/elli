@@ -179,6 +179,18 @@ handle('GET', [<<"403">>], _Req) ->
 handle('GET', [<<"invalid_return">>], _Req) ->
     {invalid_return};
 
+handle('POST', [<<"json">>], Req) ->
+    %% the paylob is json format
+    Payload = jsx:decode(elli_request:body(Req)),
+    {200, [{<<"Content-type">>, <<"text/plain; charset=ISO-8859-1">>}],
+    io_lib:format("~p", [Payload])};
+
+handle('GET', [<<"headers">>], Req) ->
+    %% return json format
+    Headers = elli_request:headers(Req),
+    {200, [{<<"Content-type">>, <<"application/json; charset=ISO-8859-1">>}],
+    jsx:encode(Headers)};
+
 handle(_, _, _Req) ->
     {404, [], <<"Not Found">>}.
 
