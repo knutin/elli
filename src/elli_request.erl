@@ -78,7 +78,7 @@ get_arg_decoded(Key, #req{args = Args}, Default) ->
     case proplists:get_value(Key, Args) of
         undefined -> Default;
         EncodedValue ->
-            list_to_binary(http_uri:decode(binary_to_list(EncodedValue)))
+            decode_uri(EncodedValue)
     end.
 
 %% @doc Parses application/x-www-form-urlencoded body into a proplist
@@ -106,7 +106,7 @@ post_arg_decoded(Key, #req{} = Req, Default) ->
     case proplists:get_value(Key, body_qs(Req)) of
         undefined -> Default;
         EncodedValue ->
-            list_to_binary(http_uri:decode(binary_to_list(EncodedValue)))
+            decode_uri(EncodedValue)
     end.
 
 
@@ -121,7 +121,7 @@ get_args_decoded(#req{args = Args}) ->
     lists:map(fun ({K, true}) ->
                       {K, true};
                   ({K, V}) ->
-                      {K, list_to_binary(http_uri:decode(binary_to_list(V)))}
+                      {K, decode_uri(V)}
               end, Args).
 
 
@@ -132,7 +132,7 @@ post_args_decoded(#req{} = Req) ->
     lists:map(fun ({K, true}) ->
                       {K, true};
                   ({K, V}) ->
-                      {K, list_to_binary(http_uri:decode(binary_to_list(V)))}
+                      {K, decode_uri(V)}
               end, body_qs(Req)).
 
 -spec query_str(#req{}) -> QueryStr :: binary().
@@ -248,3 +248,16 @@ is_ref_alive(Ref) ->
 
 is_request(#req{}) -> true;
 is_request(_)      -> false.
+
+decode_uri(<<$+, Rest/binary>>) ->
+    <<$ , (decode_uri(Rest))/binary>>;
+decode_uri(<<$%, HexA, HexB, Rest/binary>>) ->
+    <<(hex_to_int(HexA)*16+hex_to_int(HexB)), (decode_uri(Rest))/binary>>;
+decode_uri(<<C, Rest/binary>>) ->
+    <<C, (decode_uri(Rest))/binary>>;
+decode_uri(<<>>) ->
+    <<>>.
+
+hex_to_int(X) when X >= $0, X =< $9 -> X-$0;
+hex_to_int(X) when X >= $a, X =< $f -> X-$a+10;
+hex_to_int(X) when X >= $A, X =< $F -> X-$A+10.
