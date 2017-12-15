@@ -251,9 +251,13 @@ is_request(_)      -> false.
 
 decode_uri(<<$+, Rest/binary>>) ->
     <<$ , (decode_uri(Rest))/binary>>;
-decode_uri(<<$%, Hex:2/bytes, Rest/binary>>) ->
-    <<(binary_to_integer(Hex, 16)), (decode_uri(Rest))/binary>>;
+decode_uri(<<$%, HexA, HexB, Rest/binary>>) ->
+    <<(hex_to_int(HexA)*16+hex_to_int(HexB)), (decode_uri(Rest))/binary>>;
 decode_uri(<<C, Rest/binary>>) ->
     <<C, (decode_uri(Rest))/binary>>;
 decode_uri(<<>>) ->
     <<>>.
+
+hex_to_int(X) when X >= $0, X =< $9 -> X-$0;
+hex_to_int(X) when X >= $a, X =< $f -> X-$a+10;
+hex_to_int(X) when X >= $A, X =< $F -> X-$A+10.
