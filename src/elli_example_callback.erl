@@ -215,6 +215,10 @@ chunk_loop(Ref, N) ->
 %% tree.
 handle_event(elli_startup, [], _) -> ok;
 
+%% elli_socket callback is sent when Elli have opened listening socket.
+%% You can get or change socket opts.
+handle_event(elli_socket, _SocketRef, _) -> ok;
+
 %% request_complete fires *after* Elli has sent the response to the
 %% client. Timings contains timestamps of events like when the
 %% connection was accepted, when request parsing finished, when the
