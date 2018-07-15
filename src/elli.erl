@@ -117,6 +117,8 @@ init([Opts]) ->
                                                     | SSLSockOpts
                                                    ]),
 
+    ok = Callback:handle_event(elli_socket, Socket, CallbackArgs),
+
     Acceptors = ets:new(acceptors, [private, set]),
     StartAcc  = fun() ->
         Pid = elli_http:start_link(self(), Socket, Options, {Callback, CallbackArgs}),
